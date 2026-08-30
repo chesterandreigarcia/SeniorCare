@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import {
   Heart,
   ShieldCheck,
@@ -14,7 +14,13 @@ import {
   Pencil,
   Search,
   ChevronDown,
+  Loader2,
+  WifiOff,
 } from "lucide-react";
+import {
+  getBarangays,
+  registerSeniorCitizen,
+} from "../services/registrationService.js";
 
 /**
  * SENIORCARE — Senior Citizen Registration
@@ -41,14 +47,15 @@ const STEPS = [
   { key: "review", label: "Review", n: "08" },
 ];
 
-const BARANGAYS = [
-  "Barangay San Isidro",
-  "Barangay Santa Cruz",
-  "Barangay Poblacion",
-  "Barangay San Antonio",
-  "Barangay Bagong Silang",
-  "Barangay Malaya",
-];
+// Barangays now come from GET /api/barangays (see BarangayStep + the
+// `barangays` state in SeniorCareRegisterPage). No static list here —
+// the backend is the source of truth for which barangays are active.
+
+// Basic client-side email format check. Intentionally not exhaustive —
+// the backend (Zod's z.string().email()) remains the source of truth,
+// this just catches obviously malformed input before Submit so the user
+// isn't surprised by a 400 at the very end of the wizard.
+const EMAIL_FORMAT_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // ---------- shared field components ----------
 
@@ -407,6 +414,8 @@ function StepNav({
   backLabel = "Back",
   showBack = true,
   nextDisabled,
+  nextIcon: NextIcon,
+  nextIconSpin,
 }) {
   return (
     <div
@@ -417,7 +426,8 @@ function StepNav({
         <button
           type="button"
           onClick={onBack}
-          className="inline-flex items-center justify-center gap-2 text-[15px] font-semibold px-6 py-3.5 rounded-md border-2 hover:bg-slate-50 transition-colors"
+          disabled={nextDisabled}
+          className="inline-flex items-center justify-center gap-2 text-[15px] font-semibold px-6 py-3.5 rounded-md border-2 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           style={{ borderColor: COLORS.baltic, color: COLORS.baltic }}
         >
           <ArrowLeft className="w-4 h-4" aria-hidden="true" />
@@ -430,11 +440,19 @@ function StepNav({
         type="button"
         onClick={onNext}
         disabled={nextDisabled}
-        className="inline-flex items-center justify-center gap-2 text-[15px] font-semibold px-7 py-3.5 rounded-md text-white shadow-sm hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+        aria-busy={nextIconSpin || undefined}
+        className="inline-flex items-center justify-center gap-2 text-[15px] font-semibold px-7 py-3.5 rounded-md text-white shadow-sm hover:opacity-90 disabled:opacity-70 disabled:cursor-not-allowed transition-opacity"
         style={{ backgroundColor: COLORS.baltic }}
       >
         {nextLabel}
-        <ArrowRight className="w-4 h-4" aria-hidden="true" />
+        {NextIcon ? (
+          <NextIcon
+            className={`w-4 h-4 ${nextIconSpin ? "animate-spin" : ""}`}
+            aria-hidden="true"
+          />
+        ) : (
+          <ArrowRight className="w-4 h-4" aria-hidden="true" />
+        )}
       </button>
     </div>
   );
@@ -454,6 +472,35 @@ function StepHeading({ title, helper }) {
       )}
     </div>
   );
+}
+
+// Backend validation errors are keyed by the API's field paths (e.g.
+// "address.street", "guardian.firstName", "barangayId"). This maps them
+// onto the local `errors` state's flat keys so they highlight the same
+// fields the frontend's own validation would.
+const BACKEND_TO_LOCAL_ERROR_KEY = {
+  barangayId: "barangay",
+  "address.street": "street",
+  "address.municipality": "municipality",
+  accountEmail: "accountEmail",
+  mobileNumber: "mobile",
+  seniorCitizenId: "seniorId",
+  dateOfBirth: "dob",
+  "guardian.firstName": "guardianFirstName",
+  "guardian.lastName": "guardianLastName",
+  "guardian.relationship": "guardianRelationship",
+  "guardian.mobileNumber": "guardianMobile",
+  password: "password",
+  documents: "documents",
+};
+
+function mapBackendFieldErrors(fieldErrors) {
+  const mapped = {};
+  for (const [key, message] of Object.entries(fieldErrors)) {
+    const localKey = BACKEND_TO_LOCAL_ERROR_KEY[key] || key;
+    mapped[localKey] = Array.isArray(message) ? message.join(" ") : message;
+  }
+  return mapped;
 }
 
 function calcAge(dobStr) {
@@ -476,8 +523,38 @@ export default function SeniorCareRegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [barangaySearch, setBarangaySearch] = useState("");
 
+  // Live barangay data from GET /api/barangays.
+  const [barangays, setBarangays] = useState([]);
+  const [barangaysLoading, setBarangaysLoading] = useState(true);
+  const [barangaysError, setBarangaysError] = useState(null);
+
+  // Final submission state (POST /api/registration).
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadBarangays() {
+      setBarangaysLoading(true);
+      setBarangaysError(null);
+      try {
+        const data = await getBarangays();
+        if (!cancelled) setBarangays(data);
+      } catch (err) {
+        if (!cancelled) setBarangaysError(err.message);
+      } finally {
+        if (!cancelled) setBarangaysLoading(false);
+      }
+    }
+    loadBarangays();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const [form, setForm] = useState({
-    barangay: "",
+    barangayId: "",
+    barangayName: "", // display-only, kept in sync with barangayId for the review step
     firstName: "",
     middleName: "",
     lastName: "",
@@ -516,7 +593,7 @@ export default function SeniorCareRegisterPage() {
   const age = useMemo(() => calcAge(form.dob), [form.dob]);
 
   // effective steps (skip guardian fields display but keep step for consistent nav)
-//   const effectiveSteps = STEPS;
+  // const effectiveSteps = STEPS;
 
   const set = (key, value) => setForm((f) => ({ ...f, [key]: value }));
   const clearError = (key) => setErrors((e) => ({ ...e, [key]: undefined }));
@@ -525,7 +602,7 @@ export default function SeniorCareRegisterPage() {
     const key = STEPS[stepIndex].key;
     const newErrors = {};
     if (key === "barangay") {
-      if (!form.barangay)
+      if (!form.barangayId)
         newErrors.barangay = "Please select your barangay to continue.";
     }
     if (key === "personal") {
@@ -577,8 +654,15 @@ export default function SeniorCareRegisterPage() {
       }
     }
     if (key === "account") {
-      if (!form.accountEmail)
+      if (!form.accountEmail) {
         newErrors.accountEmail = "Please enter an email address.";
+      } else if (!EMAIL_FORMAT_RE.test(form.accountEmail.trim())) {
+        // Catches malformed input (missing "@", missing domain, stray
+        // spaces, etc.) at this step, matching the backend's
+        // z.string().email() rule in registration.validator.js, so the
+        // user isn't surprised by a 400 later at Submit.
+        newErrors.accountEmail = "Please enter a valid email address.";
+      }
       if (!form.password) newErrors.password = "Please create a password.";
       else if (
         form.password.length < 8 ||
@@ -601,15 +685,36 @@ export default function SeniorCareRegisterPage() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const goNext = () => {
+  const goNext = async () => {
     if (!validateStep()) return;
+
     if (stepIndex === STEPS.length - 1) {
-      setSubmitted(true);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      if (submitting) return; // guard against double submission
+      setSubmitError(null);
+      setSubmitting(true);
+      try {
+        await registerSeniorCitizen(form);
+        // Success: never auto-login, never redirect to a dashboard —
+        // just show the existing Pending Verification confirmation state.
+        setSubmitted(true);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      } catch (err) {
+        // err is a normalized { status, code, message, fieldErrors }
+        if (err.fieldErrors) {
+          setErrors((prev) => ({
+            ...prev,
+            ...mapBackendFieldErrors(err.fieldErrors),
+          }));
+        }
+        setSubmitError(err);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      } finally {
+        setSubmitting(false);
+      }
       return;
     }
-    let next = stepIndex + 1;
-    // skip guardian detail fields visually handled inside step; step itself stays
+
+    const next = stepIndex + 1;
     setStepIndex(next);
     setErrors({});
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -626,10 +731,6 @@ export default function SeniorCareRegisterPage() {
     setErrors({});
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
-
-  const filteredBarangays = BARANGAYS.filter((b) =>
-    b.toLowerCase().includes(barangaySearch.toLowerCase()),
-  );
 
   if (submitted) {
     return <SuccessState />;
@@ -710,7 +811,17 @@ export default function SeniorCareRegisterPage() {
                 errors={errors}
                 search={barangaySearch}
                 setSearch={setBarangaySearch}
-                filtered={filteredBarangays}
+                barangays={barangays}
+                barangaysLoading={barangaysLoading}
+                barangaysError={barangaysError}
+                onRetry={() => {
+                  setBarangaysError(null);
+                  setBarangaysLoading(true);
+                  getBarangays()
+                    .then(setBarangays)
+                    .catch((err) => setBarangaysError(err.message))
+                    .finally(() => setBarangaysLoading(false));
+                }}
                 clearError={clearError}
               />
             )}
@@ -767,6 +878,7 @@ export default function SeniorCareRegisterPage() {
                 errors={errors}
                 set={set}
                 goToStep={goToStep}
+                submitError={submitError}
               />
             )}
 
@@ -774,11 +886,20 @@ export default function SeniorCareRegisterPage() {
               onBack={goBack}
               onNext={goNext}
               showBack={stepIndex > 0}
+              nextDisabled={
+                submitting ||
+                (currentKey === "barangay" &&
+                  (barangaysLoading || !!barangaysError))
+              }
               nextLabel={
                 stepIndex === STEPS.length - 1
-                  ? "Submit Registration"
+                  ? submitting
+                    ? "Submitting..."
+                    : "Submit Registration"
                   : "Continue"
               }
+              nextIcon={submitting ? Loader2 : undefined}
+              nextIconSpin={submitting}
             />
           </div>
 
@@ -845,84 +966,152 @@ function BarangayStep({
   errors,
   search,
   setSearch,
-  filtered,
+  barangays,
+  barangaysLoading,
+  barangaysError,
+  onRetry,
   clearError,
 }) {
+  // Defensive fallback: `barangays` is expected to always be an array
+  // (state is initialized as [], and getBarangays() now always resolves
+  // to an array — see registrationService.js). This guard just makes the
+  // render safe against any future caller that forgets that contract,
+  // without hiding fetch failures — those still surface via `barangaysError`.
+  const safeBarangays = Array.isArray(barangays) ? barangays : [];
+
+  const filtered = safeBarangays.filter((b) =>
+    `${b.name} ${b.municipality}`.toLowerCase().includes(search.toLowerCase()),
+  );
+
+  const selectBarangay = (b) => {
+    set("barangayId", b._id);
+    set("barangayName", b.name);
+    clearError("barangay");
+  };
+
   return (
     <div>
       <StepHeading
         title="Select Your Barangay"
         helper="Your SENIORCARE records will be managed by the barangay you select. Choose the barangay where you are registered as a resident."
       />
-      <div className="mb-4">
-        <FieldLabel htmlFor="barangaySearch">Search Barangay</FieldLabel>
-        <div className="relative">
-          <Search
-            className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+
+      {barangaysLoading && (
+        <div className="flex items-center gap-2.5 text-[15px] text-slate-500 py-6">
+          <Loader2
+            className="w-5 h-5 animate-spin"
+            style={{ color: COLORS.baltic }}
             aria-hidden="true"
           />
-          <input
-            id="barangaySearch"
-            type="text"
-            placeholder="Type to search..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-md border pl-11 pr-4 py-3 text-[15px] focus:outline-none focus:ring-2"
-            style={{ borderColor: COLORS.alabaster }}
-            onFocus={(e) =>
-              (e.target.style.boxShadow = `0 0 0 3px ${COLORS.sky}55`)
-            }
-            onBlur={(e) => (e.target.style.boxShadow = "none")}
-          />
+          Loading barangays...
         </div>
-      </div>
+      )}
 
-      <div
-        className="flex flex-col gap-2 mb-2"
-        role="radiogroup"
-        aria-label="Barangay list"
-      >
-        {filtered.length === 0 && (
-          <p className="text-sm text-slate-500 py-3">
-            No barangay matches your search.
-          </p>
-        )}
-        {filtered.map((b) => {
-          const selected = form.barangay === b;
-          return (
-            <button
-              key={b}
-              type="button"
-              onClick={() => {
-                set("barangay", b);
-                clearError("barangay");
-              }}
-              className="flex items-center justify-between rounded-md border px-4 py-3.5 text-left transition-colors"
-              style={{
-                borderColor: selected ? COLORS.baltic : COLORS.alabaster,
-                backgroundColor: selected ? COLORS.sky + "22" : "white",
-              }}
+      {!barangaysLoading && barangaysError && (
+        <div
+          className="rounded-md border p-4 flex items-start gap-3 mb-4"
+          style={{ borderColor: "#e3a893", backgroundColor: "#fbeae6" }}
+        >
+          <WifiOff
+            className="w-5 h-5 shrink-0 mt-0.5"
+            style={{ color: "#b8452f" }}
+            aria-hidden="true"
+          />
+          <div>
+            <p
+              className="text-[15px] font-semibold mb-1"
+              style={{ color: COLORS.yale }}
             >
-              <span
-                className="text-[15px] font-medium"
-                style={{ color: selected ? COLORS.yale : "#334155" }}
-              >
-                {b}
-              </span>
-              {selected && (
-                <CircleCheck
-                  className="w-5 h-5"
-                  style={{ color: COLORS.baltic }}
-                  aria-hidden="true"
-                />
-              )}
+              Couldn't load barangays
+            </p>
+            <p className="text-sm text-slate-600 mb-3">{barangaysError}</p>
+            <button
+              type="button"
+              onClick={onRetry}
+              className="text-sm font-semibold px-4 py-2 rounded-md text-white"
+              style={{ backgroundColor: COLORS.baltic }}
+            >
+              Try Again
             </button>
-          );
-        })}
-      </div>
+          </div>
+        </div>
+      )}
+
+      {!barangaysLoading && !barangaysError && (
+        <>
+          <div className="mb-4">
+            <FieldLabel htmlFor="barangaySearch">Search Barangay</FieldLabel>
+            <div className="relative">
+              <Search
+                className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                aria-hidden="true"
+              />
+              <input
+                id="barangaySearch"
+                type="text"
+                placeholder="Type to search..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full rounded-md border pl-11 pr-4 py-3 text-[15px] focus:outline-none focus:ring-2"
+                style={{ borderColor: COLORS.alabaster }}
+                onFocus={(e) =>
+                  (e.target.style.boxShadow = `0 0 0 3px ${COLORS.sky}55`)
+                }
+                onBlur={(e) => (e.target.style.boxShadow = "none")}
+              />
+            </div>
+          </div>
+
+          <div
+            className="flex flex-col gap-2 mb-2"
+            role="radiogroup"
+            aria-label="Barangay list"
+          >
+            {filtered.length === 0 && (
+              <p className="text-sm text-slate-500 py-3">
+                No barangay matches your search.
+              </p>
+            )}
+            {filtered.map((b) => {
+              const selected = form.barangayId === b._id;
+              return (
+                <button
+                  key={b._id}
+                  type="button"
+                  onClick={() => selectBarangay(b)}
+                  className="flex items-center justify-between rounded-md border px-4 py-3.5 text-left transition-colors"
+                  style={{
+                    borderColor: selected ? COLORS.baltic : COLORS.alabaster,
+                    backgroundColor: selected ? COLORS.sky + "22" : "white",
+                  }}
+                >
+                  <span
+                    className="text-[15px] font-medium"
+                    style={{ color: selected ? COLORS.yale : "#334155" }}
+                  >
+                    {b.name}
+                    <span className="font-normal text-slate-500">
+                      {" "}
+                      — {b.municipality}
+                    </span>
+                  </span>
+                  {selected && (
+                    <CircleCheck
+                      className="w-5 h-5"
+                      style={{ color: COLORS.baltic }}
+                      aria-hidden="true"
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+
       <ErrorText>{errors.barangay}</ErrorText>
 
-      {form.barangay && (
+      {form.barangayId && (
         <div
           className="mt-5 rounded-md border p-4 flex items-start gap-3"
           style={{ borderColor: COLORS.alabaster, backgroundColor: "#f7f9f9" }}
@@ -934,7 +1123,7 @@ function BarangayStep({
           />
           <p className="text-[15px]" style={{ color: COLORS.yale }}>
             Your registration will be submitted to{" "}
-            <span className="font-bold">{form.barangay}</span>.
+            <span className="font-bold">{form.barangayName}</span>.
           </p>
         </div>
       )}
@@ -1096,7 +1285,7 @@ function ContactStep({ form, set, errors, clearError }) {
           className="text-[15px] font-medium"
           style={{ color: COLORS.yale }}
         >
-          {form.barangay || "Not selected"}
+          {form.barangayName || "Not selected"}
         </span>
         <span
           className="text-xs font-semibold flex items-center gap-1"
@@ -1381,7 +1570,7 @@ function AccountStep({
       <div className="flex flex-col gap-5 max-w-lg">
         <TextField
           id="accountEmail"
-          label="Email / Username"
+          label="Email"
           required
           type="email"
           value={form.accountEmail}
@@ -1504,14 +1693,14 @@ function ReviewSection({ title, onEdit, children }) {
   );
 }
 
-function ReviewStep({ form, age, errors, set, goToStep }) {
+function ReviewStep({ form, age, errors, set, goToStep, submitError }) {
   const fullName = [form.firstName, form.middleName, form.lastName, form.suffix]
     .filter(Boolean)
     .join(" ");
   const address = [
     form.houseNo,
     form.street,
-    form.barangay,
+    form.barangayName,
     form.municipality,
     form.province,
     form.postalCode,
@@ -1526,8 +1715,41 @@ function ReviewStep({ form, age, errors, set, goToStep }) {
         helper="Please review your information carefully before submitting your registration."
       />
 
+      {submitError && (
+        <div
+          role="alert"
+          className="rounded-md border p-4 flex items-start gap-3 mb-6"
+          style={{ borderColor: "#e3a893", backgroundColor: "#fbeae6" }}
+        >
+          {submitError.code === "NETWORK_ERROR" ? (
+            <WifiOff
+              className="w-5 h-5 shrink-0 mt-0.5"
+              style={{ color: "#b8452f" }}
+              aria-hidden="true"
+            />
+          ) : (
+            <AlertCircle
+              className="w-5 h-5 shrink-0 mt-0.5"
+              style={{ color: "#b8452f" }}
+              aria-hidden="true"
+            />
+          )}
+          <div>
+            <p
+              className="text-[15px] font-bold mb-1"
+              style={{ color: COLORS.yale }}
+            >
+              We couldn't submit your registration
+            </p>
+            <p className="text-sm leading-relaxed" style={{ color: "#334155" }}>
+              {submitError.message}
+            </p>
+          </div>
+        </div>
+      )}
+
       <ReviewSection title="Barangay" onEdit={() => goToStep(0)}>
-        <ReviewRow label="Selected Barangay" value={form.barangay} />
+        <ReviewRow label="Selected Barangay" value={form.barangayName} />
       </ReviewSection>
 
       <ReviewSection title="Personal Information" onEdit={() => goToStep(1)}>
@@ -1645,7 +1867,7 @@ function ReviewStep({ form, age, errors, set, goToStep }) {
         </p>
         <p className="text-sm text-slate-600 leading-relaxed">
           Your registration will be sent to{" "}
-          {form.barangay || "your selected barangay"} for verification.
+          {form.barangayName || "your selected barangay"} for verification.
         </p>
       </div>
     </div>

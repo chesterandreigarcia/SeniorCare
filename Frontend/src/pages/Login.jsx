@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Heart,
   Mail,
@@ -12,6 +13,11 @@ import {
   Building2,
   Loader2,
 } from "lucide-react";
+import {
+  login,
+  storeSession,
+  ROLE_DASHBOARD_ROUTES,
+} from "../services/authService.js";
 
 /**
  * SENIORCARE — Login Page
@@ -31,14 +37,18 @@ const COLORS = {
   alabaster: "#d9dcd6",
 };
 
-// Route map — adapt to the project's actual router.
-// const DASHBOARD_ROUTES = {
-//   senior: "/senior/dashboard",
-//   guardian: "/guardian/dashboard",
-//   barangay_staff: "/barangay/dashboard",
-//   admin: "/admin/dashboard",
-//   lgu_osca: "/lgu/dashboard",
-// };
+// Backend AccountStatusError/AuthenticationError codes (see auth.service.js)
+// mapped to this page's existing authState values. ACCOUNT_REJECTED and
+// ACCOUNT_NOT_ACTIVE reuse the "inactive" visual treatment since no
+// separate design exists for them yet — the backend's own message is
+// still shown, so the user isn't told something inaccurate.
+const STATUS_TO_AUTH_STATE = {
+  AUTHENTICATION_ERROR: "invalid",
+  ACCOUNT_PENDING_VERIFICATION: "pending",
+  ACCOUNT_INACTIVE: "inactive",
+  ACCOUNT_REJECTED: "inactive",
+  ACCOUNT_NOT_ACTIVE: "inactive",
+};
 
 // ---------- shared field components (mirrors registration page styling) ----------
 
@@ -112,12 +122,16 @@ function AuthMessage({ variant, title, children }) {
 // ---------- main component ----------
 
 export default function SeniorCareLoginPage() {
+  const navigate = useNavigate();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
   const [authState, setAuthState] = useState("idle"); // idle | loading | invalid | pending | inactive | success
-  //   const [redirecting, setRedirecting] = useState(false);
+  // Backend-provided message shown inside the AuthMessage banner. Falls
+  // back to a sensible default per variant if the backend didn't send one
+  // (e.g. a network failure has no server message at all).
+  const [authMessage, setAuthMessage] = useState("");
 
   const validate = () => {
     const errs = {};
@@ -135,20 +149,17 @@ export default function SeniorCareLoginPage() {
 
     setAuthState("loading");
 
-    // Placeholder for the real authentication call. Replace with the
-    // project's existing auth service (e.g. Supabase, Firebase, custom API).
-    // This structure intentionally does not fake a working backend.
     try {
-      // const result = await authService.login({ identifier, password });
-      // Simulated outcome hook-up point:
-      await new Promise((res) => setTimeout(res, 900));
-
-      // Example dispatch based on a hypothetical `result.status`/`result.role`.
-      // Left as a clear integration point — no fabricated success.
-      setAuthState("invalid");
+      const { accessToken, user } = await login({ identifier, password });
+      storeSession({ accessToken, user });
+      setAuthState("idle"); // clear any prior error banner
+      const destination = ROLE_DASHBOARD_ROUTES[user.role] || "/";
+      navigate(destination);
     } catch (err) {
-      err;
-      setAuthState("invalid");
+      // err is a normalized ApiError: { status, code, message, fieldErrors }
+      const mappedState = STATUS_TO_AUTH_STATE[err.code] || "invalid";
+      setAuthMessage(err.message || "Invalid email or password.");
+      setAuthState(mappedState);
     }
   };
 
@@ -209,7 +220,7 @@ export default function SeniorCareLoginPage() {
 
             {authState === "invalid" && (
               <AuthMessage variant="error">
-                Invalid email or password.
+                {authMessage || "Invalid email or password."}
               </AuthMessage>
             )}
             {authState === "pending" && (
@@ -217,15 +228,14 @@ export default function SeniorCareLoginPage() {
                 variant="pending"
                 title="Account Pending Barangay Verification"
               >
-                Your registration has been submitted successfully, but your
-                barangay has not yet completed verification. You will be able to
-                access SENIORCARE after your account is approved and activated.
+                {authMessage ||
+                  "Your registration has been submitted successfully, but your barangay has not yet completed verification. You will be able to access SENIORCARE after your account is approved and activated."}
               </AuthMessage>
             )}
             {authState === "inactive" && (
               <AuthMessage variant="inactive" title="Account Inactive">
-                Your SENIORCARE account is currently inactive. Please contact
-                your barangay office for assistance.
+                {authMessage ||
+                  "Your SENIORCARE account is currently inactive. Please contact your barangay office for assistance."}
               </AuthMessage>
             )}
 
@@ -251,7 +261,7 @@ export default function SeniorCareLoginPage() {
               <form onSubmit={handleSubmit} noValidate>
                 <div className="mb-5">
                   <FieldLabel htmlFor="identifier">
-                    Email or Username
+                    Email
                   </FieldLabel>
                   <div className="relative">
                     <Mail
