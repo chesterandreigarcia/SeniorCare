@@ -11,6 +11,8 @@ const router = Router();
 const staffOrAbove = authorizeRoles(ROLES.BARANGAY_STAFF, ROLES.ADMIN, ROLES.LGU_OSCA);
 
 router.get("/pending", authenticate, staffOrAbove, verificationController.listPending);
+router.get("/stats", authenticate, staffOrAbove, verificationController.getStats);
+router.get("/documents/:documentId/file", authenticate, staffOrAbove, verificationController.getDocument);
 router.get("/:id", authenticate, staffOrAbove, verificationController.getOne);
 router.patch(
   "/:id/approve",

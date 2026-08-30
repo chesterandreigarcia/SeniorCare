@@ -1,30 +1,72 @@
 import mongoose from "mongoose";
+import fs from "node:fs";
+import path from "node:path";
 import Verification from "../models/Verification.js";
 import Senior from "../models/Senior.js";
+import Guardian from "../models/Guardian.js";
+import Document from "../models/Document.js";
 import User from "../models/User.js";
+import Barangay from "../models/Barangay.js";
 import { ACCOUNT_STATUS, VERIFICATION_STATUS, ROLES } from "../utils/constants.js";
 import { NotFoundError, AuthorizationError, ConflictError } from "../utils/errors.js";
 
 /**
  * Returns pending verifications, scoped to the requesting staff member's
  * assigned barangay unless they hold ADMIN/LGU_OSCA (broader) access.
+ *
+ * Supports optional search (senior name / senior citizen ID) and pagination.
+ * When no pagination params are supplied, behavior matches the original
+ * implementation (full result array) so existing callers aren't affected.
  */
-export async function listPendingVerifications(requestingUser) {
+export async function listPendingVerifications(requestingUser, options = null) {
+  const { search = "", page, limit, barangayId } = options || {};
+
   const query = { status: VERIFICATION_STATUS.PENDING };
 
   const hasBroadAccess = [ROLES.ADMIN, ROLES.LGU_OSCA].includes(requestingUser.role);
   if (!hasBroadAccess) {
     if (!requestingUser.assignedBarangayId) {
       // Staff with no assigned barangay sees nothing — fail closed, not open.
-      return [];
+      return options ? { data: [], total: 0, page: 1, limit: 0, totalPages: 1 } : [];
     }
     query.barangayId = requestingUser.assignedBarangayId;
+  } else if (barangayId) {
+    // Admin/LGU_OSCA may optionally narrow to a single barangay.
+    query.barangayId = barangayId;
   }
 
-  return Verification.find(query)
-    .populate({ path: "seniorId", select: "firstName lastName dateOfBirth mobileNumber" })
+  if (search && search.trim()) {
+    const term = search.trim();
+    const regex = new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+    const matchingSeniors = await Senior.find({
+      $or: [{ firstName: regex }, { lastName: regex }, { seniorCitizenId: regex }],
+    }).select("_id");
+    query.seniorId = { $in: matchingSeniors.map((s) => s._id) };
+  }
+
+  const baseQuery = Verification.find(query)
+    .populate({ path: "seniorId", select: "firstName lastName dateOfBirth mobileNumber seniorCitizenId" })
     .populate({ path: "barangayId", select: "name municipality" })
     .sort({ createdAt: 1 });
+
+  // Preserve the original behavior exactly when called without `options`
+  // (e.g. existing unit tests / any other internal caller): returns a
+  // plain array with no pagination wrapper.
+  if (!options) {
+    return baseQuery;
+  }
+
+  const total = await Verification.countDocuments(query);
+  const pageNum = Number(page) > 0 ? Number(page) : null;
+  const limitNum = Number(limit) > 0 ? Number(limit) : null;
+
+  if (pageNum && limitNum) {
+    const results = await baseQuery.skip((pageNum - 1) * limitNum).limit(limitNum);
+    return { data: results, total, page: pageNum, limit: limitNum, totalPages: Math.ceil(total / limitNum) || 1 };
+  }
+
+  const results = await baseQuery;
+  return { data: results, total, page: 1, limit: total, totalPages: 1 };
 }
 
 export async function getVerificationById(verificationId, requestingUser) {
@@ -35,7 +77,79 @@ export async function getVerificationById(verificationId, requestingUser) {
   if (!verification) throw new NotFoundError("Verification record not found.");
 
   assertBarangayScope(verification, requestingUser);
-  return verification;
+
+  const senior = verification.seniorId;
+  const [guardian, documents] = await Promise.all([
+    senior?.guardianId ? Guardian.findById(senior.guardianId) : null,
+    Document.find({ seniorId: senior?._id }).select("-storageKey"),
+  ]);
+
+  return {
+    ...verification.toObject({ virtuals: true }),
+    guardian,
+    documents,
+  };
+}
+
+/**
+ * Returns dashboard statistics (pending / active / rejected / total seniors),
+ * scoped to the requesting user's authorization the same way listPendingVerifications is.
+ */
+export async function getVerificationStats(requestingUser) {
+  const hasBroadAccess = [ROLES.ADMIN, ROLES.LGU_OSCA].includes(requestingUser.role);
+  const seniorMatch = {};
+  if (!hasBroadAccess) {
+    if (!requestingUser.assignedBarangayId) {
+      return { pending: 0, active: 0, rejected: 0, total: 0 };
+    }
+    seniorMatch.barangayId = new mongoose.Types.ObjectId(requestingUser.assignedBarangayId);
+  }
+
+  const [pending, statusCounts, total] = await Promise.all([
+    Verification.countDocuments({
+      status: VERIFICATION_STATUS.PENDING,
+      ...(seniorMatch.barangayId ? { barangayId: seniorMatch.barangayId } : {}),
+    }),
+    Senior.aggregate([
+      { $match: seniorMatch },
+      { $lookup: { from: "users", localField: "userId", foreignField: "_id", as: "user" } },
+      { $unwind: "$user" },
+      { $group: { _id: "$user.status", count: { $sum: 1 } } },
+    ]),
+    Senior.countDocuments(seniorMatch),
+  ]);
+
+  const active = statusCounts.find((s) => s._id === ACCOUNT_STATUS.ACTIVE)?.count || 0;
+  const rejected = statusCounts.find((s) => s._id === ACCOUNT_STATUS.REJECTED)?.count || 0;
+
+  return { pending, active, rejected, total };
+}
+
+/**
+ * Resolves an on-disk document for streaming, after checking the requesting
+ * user is authorized to view documents for that senior's barangay.
+ */
+export async function getDocumentForDownload(documentId, requestingUser) {
+  const document = await Document.findById(documentId);
+  if (!document) throw new NotFoundError("Document not found.");
+
+  const senior = await Senior.findById(document.seniorId).select("barangayId");
+  if (!senior) throw new NotFoundError("Associated senior profile not found.");
+
+  const hasBroadAccess = [ROLES.ADMIN, ROLES.LGU_OSCA].includes(requestingUser.role);
+  if (!hasBroadAccess) {
+    if (!requestingUser.assignedBarangayId || requestingUser.assignedBarangayId !== senior.barangayId.toString()) {
+      throw new AuthorizationError("You are not authorized to view this document.");
+    }
+  }
+
+  const uploadDir = process.env.UPLOAD_DIR || "uploads";
+  const filePath = path.join(uploadDir, document.storageKey);
+  if (!fs.existsSync(filePath)) {
+    throw new NotFoundError("The document file could not be found on the server.");
+  }
+
+  return { filePath, fileName: document.fileName, mimeType: document.mimeType };
 }
 
 function assertBarangayScope(verification, requestingUser) {

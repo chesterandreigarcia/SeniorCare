@@ -13,6 +13,18 @@ export const api = axios.create({
   withCredentials: true,
 });
 
+// Attaches the stored access token (see authService.js storeSession) to
+// every outgoing request, if one exists. Requests made before login (e.g.
+// registration, the login call itself) simply have no token yet, so this
+// is a no-op for them — nothing about existing unauthenticated flows changes.
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("seniorcare_access_token");
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 // Normalizes anything thrown by axios (validation errors, network errors,
 // unexpected server responses) into one predictable shape the UI can
 // always rely on: { message, code, fieldErrors }.
