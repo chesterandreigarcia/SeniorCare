@@ -4,6 +4,8 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import VerificationDashboard from "./pages/dashboard/VerificationDashboard.jsx";
 import SeniorReviewPage from "./pages/dashboard/SeniorReviewPage.jsx";
+import BarangayManagementPage from "./pages/dashboard/BarangayManagementPage.jsx";
+import StaffManagementPage from "./pages/dashboard/StaffManagementPage.jsx";
 import ProtectedRoute from "./routes/ProtectedRoute.jsx";
 // import Dashboard from "./pages/Dashboard";
 // import Profile from "./pages/Profile";
@@ -53,6 +55,24 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={VERIFICATION_ROLES}>
               <SeniorReviewPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Admin-only organizational management. */}
+        <Route
+          path="/admin/barangays"
+          element={
+            <ProtectedRoute allowedRoles={["ADMIN"]}>
+              <BarangayManagementPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/staff"
+          element={
+            <ProtectedRoute allowedRoles={["ADMIN"]}>
+              <StaffManagementPage />
             </ProtectedRoute>
           }
         />

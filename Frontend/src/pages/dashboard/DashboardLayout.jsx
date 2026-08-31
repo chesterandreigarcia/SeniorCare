@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Heart, ClipboardCheck, LogOut, Menu, X, ShieldCheck } from "lucide-react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { Heart, ClipboardCheck, LogOut, Menu, X, ShieldCheck, Building2, Users2 } from "lucide-react";
 import { logout as apiLogout, clearSession, getStoredUser } from "../../services/authService.js";
 import { COLORS, FONT_STACK } from "./theme.js";
 
@@ -12,15 +12,45 @@ const ROLE_LABELS = {
 
 /**
  * Shared shell for the verification workflow's authenticated pages.
- * Deliberately minimal: only "Senior Verification" is a real, working
- * feature right now, so that's the only nav item — no placeholder pages
- * for modules that don't exist yet (see MOST IMPORTANT INSTRUCTION /
- * scope limit in the project brief).
+ * Nav items are role-aware: every authorized role sees "Senior
+ * Verification" (the only feature staff needs); ADMIN additionally sees
+ * "Barangay Management" and "Staff Management" — real, working sections,
+ * not placeholders for unbuilt modules.
  */
 export default function DashboardLayout({ children, title, subtitle }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const user = getStoredUser();
+  const isAdmin = user?.role === "ADMIN";
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const dashboardHome =
+    user?.role === "ADMIN" ? "/admin/dashboard" : user?.role === "LGU_OSCA" ? "/lgu/dashboard" : "/barangay/dashboard";
+
+  const navItems = [
+    {
+      to: dashboardHome,
+      icon: ClipboardCheck,
+      label: "Senior Verification",
+      active: location.pathname === dashboardHome || location.pathname.startsWith("/verification/"),
+    },
+    ...(isAdmin
+      ? [
+          {
+            to: "/admin/barangays",
+            icon: Building2,
+            label: "Barangay Management",
+            active: location.pathname.startsWith("/admin/barangays"),
+          },
+          {
+            to: "/admin/staff",
+            icon: Users2,
+            label: "Staff Management",
+            active: location.pathname.startsWith("/admin/staff"),
+          },
+        ]
+      : []),
+  ];
 
   const handleLogout = async () => {
     try {
@@ -108,13 +138,29 @@ export default function DashboardLayout({ children, title, subtitle }) {
           </div>
 
           <nav className="flex-1 px-3 py-5 space-y-1">
-            <div
-              className="flex items-center gap-3 px-3.5 py-2.5 rounded-md text-[15px] font-semibold"
-              style={{ backgroundColor: COLORS.baltic + "14", color: COLORS.yale }}
-            >
-              <ClipboardCheck className="w-5 h-5 shrink-0" style={{ color: COLORS.baltic }} aria-hidden="true" />
-              Senior Verification
-            </div>
+            {navItems.map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                onClick={() => {
+                  setSidebarOpen(false);
+                  navigate(item.to);
+                }}
+                className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-md text-[15px] font-semibold text-left transition-colors"
+                style={
+                  item.active
+                    ? { backgroundColor: COLORS.baltic + "14", color: COLORS.yale }
+                    : { color: "#475569" }
+                }
+              >
+                <item.icon
+                  className="w-5 h-5 shrink-0"
+                  style={{ color: item.active ? COLORS.baltic : "#94a3b8" }}
+                  aria-hidden="true"
+                />
+                {item.label}
+              </button>
+            ))}
           </nav>
 
           <div className="px-4 py-4 border-t shrink-0" style={{ borderColor: COLORS.alabaster }}>

@@ -47,6 +47,24 @@ export async function logout() {
   }
 }
 
+/**
+ * GET /api/auth/me
+ * Re-fetches the authenticated user's profile from the backend — used to
+ * get fields not included in the login response (e.g. a Barangay Staff
+ * member's resolved `barangayName`, which login() doesn't return but
+ * auth.service.js#getAuthenticatedUser does). Always resolved from the
+ * authenticated user's own DB record — never trusts anything the client
+ * previously stored.
+ */
+export async function getMe() {
+  try {
+    const res = await api.get("/auth/me");
+    return res.data.user;
+  } catch (err) {
+    throw toApiError(err);
+  }
+}
+
 // ---- Minimal client-side session storage ----
 // No auth context/store exists yet in this project. Kept intentionally
 // small and swappable: if the project later adds a real AuthContext or

@@ -13,12 +13,13 @@ import {
   ChevronRight,
   Eye,
   MapPin,
+  Building2,
 } from "lucide-react";
 import DashboardLayout from "./DashboardLayout.jsx";
 import { COLORS } from "./theme.js";
 import { getPendingVerifications, getVerificationStats } from "../../services/verificationService.js";
 import { getBarangays } from "../../services/registrationService.js";
-import { getStoredUser } from "../../services/authService.js";
+import { getStoredUser, getMe } from "../../services/authService.js";
 
 const PAGE_SIZE = 10;
 
@@ -41,6 +42,63 @@ function StatCard({ icon: Icon, label, value, accent }) {
   );
 }
 
+/**
+ * Prominent "which Barangay am I scoped to" banner for Barangay Staff.
+ * Resolved from GET /api/auth/me (auth.service.js#getAuthenticatedUser),
+ * which reads the *authenticated* user's own assignedBarangayId from the
+ * database — never anything client-supplied.
+ */
+function AssignedBarangayBanner() {
+  const [profile, setProfile] = useState(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    getMe()
+      .then((data) => {
+        if (!cancelled) setProfile(data);
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (failed || (profile && !profile.barangayName)) return null;
+
+  return (
+    <div
+      className="rounded-lg border p-4 sm:p-5 flex items-center gap-4 mb-5"
+      style={{ backgroundColor: COLORS.yale, borderColor: COLORS.yale }}
+    >
+      <div
+        className="w-11 h-11 rounded-md flex items-center justify-center shrink-0"
+        style={{ backgroundColor: "rgba(255,255,255,0.15)" }}
+      >
+        <Building2 className="w-5 h-5 text-white" aria-hidden="true" />
+      </div>
+      <div className="min-w-0">
+        <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: COLORS.sky }}>
+          Assigned Barangay
+        </p>
+        {profile ? (
+          <>
+            <p className="text-lg font-extrabold text-white leading-tight truncate">{profile.barangayName}</p>
+            <p className="text-sm text-white/70">
+              {[profile.barangayMunicipality, profile.barangayProvince].filter(Boolean).join(", ")} · You can only
+              manage this barangay's records.
+            </p>
+          </>
+        ) : (
+          <p className="text-sm text-white/70">Loading your assignment...</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function calculateAge(dateOfBirth) {
   if (!dateOfBirth) return null;
   const today = new Date();
@@ -55,6 +113,7 @@ export default function VerificationDashboard() {
   const navigate = useNavigate();
   const user = getStoredUser();
   const hasBroadAccess = user?.role === "ADMIN" || user?.role === "LGU_OSCA";
+  const isStaff = user?.role === "BARANGAY_STAFF";
 
   const [stats, setStats] = useState(null);
   const [items, setItems] = useState([]);
@@ -113,6 +172,8 @@ export default function VerificationDashboard() {
           : "Review senior citizen registrations submitted in your barangay."
       }
     >
+      {isStaff && <AssignedBarangayBanner />}
+
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
         <StatCard icon={ClipboardCheck} label="Pending Verification" value={stats?.pending} accent={COLORS.cerulean} />

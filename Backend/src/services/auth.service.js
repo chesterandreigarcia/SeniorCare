@@ -115,14 +115,36 @@ export async function login({ emailOrUsername, password }) {
 }
 
 export async function getAuthenticatedUser(userId) {
-  const user = await User.findById(userId);
+  const user = await User.findById(userId).populate("assignedBarangayId", "name municipality province");
   if (!user) throw new NotFoundError("Account not found.");
-  return {
+
+  const result = {
     id: user._id.toString(),
     email: user.email,
     role: user.role,
     status: user.status,
   };
+
+  // Same resolution login() already performs — repeated here so a page
+  // refresh (which calls /api/auth/me, not /api/auth/login) still shows
+  // the staff member which Barangay they're assigned to. The backend
+  // resolves this from the authenticated user's own record; the client
+  // never supplies a barangay id.
+  if (user.role === ROLES.BARANGAY_STAFF && user.assignedBarangayId) {
+    result.barangayId = user.assignedBarangayId._id.toString();
+    result.barangayName = user.assignedBarangayId.name;
+    result.barangayMunicipality = user.assignedBarangayId.municipality;
+    result.barangayProvince = user.assignedBarangayId.province;
+  }
+
+  if (user.role === ROLES.SENIOR_CITIZEN) {
+    const senior = await Senior.findOne({ userId: user._id }).select("_id");
+    if (senior) {
+      result.seniorId = senior._id.toString();
+    }
+  }
+
+  return result;
 }
 
 export async function requestPasswordReset(email) {

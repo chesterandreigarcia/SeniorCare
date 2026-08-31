@@ -136,7 +136,7 @@ export default function SeniorCareLoginPage() {
   const validate = () => {
     const errs = {};
     if (!identifier.trim())
-      errs.identifier = "Please enter your email or username.";
+      errs.identifier = "Please enter your email";
     if (!password) errs.password = "Please enter your password.";
     setFieldErrors(errs);
     return Object.keys(errs).length === 0;
@@ -272,7 +272,7 @@ export default function SeniorCareLoginPage() {
                       id="identifier"
                       type="text"
                       autoComplete="username"
-                      placeholder="Enter your email or username"
+                      placeholder="Enter your email "
                       value={identifier}
                       onChange={(e) => {
                         setIdentifier(e.target.value);
