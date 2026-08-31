@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import fs from "node:fs";
-import path from "node:path";
+import { resolveStoragePath } from "../utils/storage.js";
 import Verification from "../models/Verification.js";
 import Senior from "../models/Senior.js";
 import Guardian from "../models/Guardian.js";
@@ -143,8 +143,11 @@ export async function getDocumentForDownload(documentId, requestingUser) {
     }
   }
 
-  const uploadDir = process.env.UPLOAD_DIR || "uploads";
-  const filePath = path.join(uploadDir, document.storageKey);
+  // Resolved via the same project-root-anchored UPLOAD_DIR that the upload
+  // middleware writes to (utils/storage.js) — not a path re-derived from
+  // process.cwd(), which is what previously let uploads and downloads
+  // silently disagree on where a file actually lives.
+  const filePath = resolveStoragePath(document.storageKey);
   if (!fs.existsSync(filePath)) {
     throw new NotFoundError("The document file could not be found on the server.");
   }
