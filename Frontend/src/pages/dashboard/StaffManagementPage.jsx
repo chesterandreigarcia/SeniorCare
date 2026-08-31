@@ -111,7 +111,7 @@ function CreateStaffDialog({ barangays, onClose, onCreated }) {
             />
             {fieldErrors.email && <p className="text-xs mt-1" style={{ color: "#b8452f" }}>{fieldErrors.email}</p>}
           </div>
-          <div>
+          {/* <div>
             <label className="block text-sm font-semibold mb-1.5" style={{ color: COLORS.yale }}>
               Username <span className="text-slate-400 font-normal">(optional)</span>
             </label>
@@ -121,7 +121,7 @@ function CreateStaffDialog({ barangays, onClose, onCreated }) {
               className="w-full rounded-md border px-3.5 py-2.5 text-[15px] focus:outline-none"
               style={{ borderColor: COLORS.alabaster }}
             />
-          </div>
+          </div> */}
           <div>
             <label className="block text-sm font-semibold mb-1.5" style={{ color: COLORS.yale }}>
               Assigned Barangay
@@ -279,7 +279,7 @@ function StaffDetailDialog({ staff, barangays, onClose, onUpdated }) {
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
+    <div className="fixed inset-0 z-60 flex items-center justify-center px-4">
       <div className="absolute inset-0 bg-black/40" onClick={submitting ? undefined : onClose} aria-hidden="true" />
       <div className="relative bg-white rounded-lg shadow-xl w-full max-w-md p-6">
         <button
