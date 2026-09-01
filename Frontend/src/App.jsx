@@ -6,6 +6,7 @@ import VerificationDashboard from "./pages/dashboard/VerificationDashboard.jsx";
 import SeniorReviewPage from "./pages/dashboard/SeniorReviewPage.jsx";
 import BarangayManagementPage from "./pages/dashboard/BarangayManagementPage.jsx";
 import StaffManagementPage from "./pages/dashboard/StaffManagementPage.jsx";
+import SeniorDashboard from "./pages/senior/SeniorDashboard.jsx";
 import ProtectedRoute from "./routes/ProtectedRoute.jsx";
 // import Dashboard from "./pages/Dashboard";
 // import Profile from "./pages/Profile";
@@ -22,6 +23,16 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+
+        {/* Senior Citizen's own service dashboard. */}
+        <Route
+          path="/senior/dashboard"
+          element={
+            <ProtectedRoute allowedRoles={["SENIOR_CITIZEN"]}>
+              <SeniorDashboard />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Barangay/Admin/LGU-OSCA verification workflow. Each role lands
             on the same dashboard component — access is enforced by the

@@ -9,6 +9,7 @@ import authRoutes from "./routes/auth.routes.js";
 import registrationRoutes from "./routes/registration.routes.js";
 import verificationRoutes from "./routes/verification.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
+import seniorRoutes from "./routes/senior.routes.js";
 import { notFoundHandler, errorHandler } from "./middleware/error.middleware.js";
 import { getBarangays } from "./controllers/registration.controller.js";
 
@@ -39,6 +40,7 @@ export function createApp() {
   app.use("/api/registration", registrationRoutes);
   app.use("/api/verifications", verificationRoutes);
   app.use("/api/admin", adminRoutes);
+  app.use("/api/seniors", seniorRoutes);
   // Convenience alias — same handler as GET /api/registration/barangays.
   app.get("/api/barangays", getBarangays);
 
