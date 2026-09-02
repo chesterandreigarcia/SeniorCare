@@ -42,6 +42,9 @@ export const DOCUMENT_TYPES = Object.freeze({
   PROOF_OF_RESIDENCY: "PROOF_OF_RESIDENCY",
   GUARDIAN_ID: "GUARDIAN_ID",
   AUTHORIZATION_DOCUMENT: "AUTHORIZATION_DOCUMENT",
+  // Additive — used only by Benefit Applications for program-specific
+  // requirements beyond the fixed set collected at registration.
+  BENEFIT_SUPPORTING_DOCUMENT: "BENEFIT_SUPPORTING_DOCUMENT",
 });
 
 export const RELATIONSHIP_TYPES = Object.freeze({
@@ -93,4 +96,31 @@ export const CLAIM_STATUS = Object.freeze({
   CLAIMED: "CLAIMED",
   MISSED: "MISSED",
   CANCELLED: "CANCELLED",
+});
+
+// ---- Benefits & Assistance Management ----
+
+export const BENEFIT_CATEGORY = Object.freeze({
+  AGE_BASED: "AGE_BASED",
+  FINANCIAL_ASSISTANCE: "FINANCIAL_ASSISTANCE",
+  OTHER: "OTHER",
+});
+
+export const BENEFIT_STATUS = Object.freeze({
+  ACTIVE: "ACTIVE",
+  INACTIVE: "INACTIVE",
+});
+
+// The Senior lifecycle a benefit application moves through. Rejection is
+// reachable from SUBMITTED/UNDER_REVIEW/ENDORSED (see the transition
+// rules in benefitApplication.service.js) — it is not a step in this
+// straight-line list, just a valid destination from those three.
+export const APPLICATION_STATUS = Object.freeze({
+  SUBMITTED: "SUBMITTED",
+  UNDER_REVIEW: "UNDER_REVIEW",
+  ENDORSED: "ENDORSED",
+  APPROVED: "APPROVED",
+  RELEASED: "RELEASED",
+  CLAIMED: "CLAIMED",
+  REJECTED: "REJECTED",
 });

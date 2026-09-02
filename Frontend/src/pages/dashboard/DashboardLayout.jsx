@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Heart, ClipboardCheck, LogOut, Menu, X, ShieldCheck, Building2, Users2, Wallet } from "lucide-react";
+import { Heart, ClipboardCheck, LogOut, Menu, X, ShieldCheck, Building2, Users2, Wallet, HandHeart } from "lucide-react";
 import { logout as apiLogout, clearSession, getStoredUser } from "../../services/authService.js";
 import { COLORS, FONT_STACK } from "./theme.js";
 
@@ -39,6 +39,12 @@ export default function DashboardLayout({ children, title, subtitle }) {
       icon: Wallet,
       label: "Pension Management",
       active: location.pathname.startsWith("/pension-management"),
+    },
+    {
+      to: "/benefits-management",
+      icon: HandHeart,
+      label: "Benefits & Assistance",
+      active: location.pathname.startsWith("/benefits-management"),
     },
     ...(isAdmin
       ? [

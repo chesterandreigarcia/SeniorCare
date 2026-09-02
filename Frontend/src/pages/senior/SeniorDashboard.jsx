@@ -26,6 +26,8 @@ import {
 } from "lucide-react";
 import { getMyProfile } from "../../services/seniorService.js";
 import PensionPanel from "./PensionPanel.jsx";
+import BenefitsPanel from "./BenefitsPanel.jsx";
+import ApplicationsPanel from "./ApplicationsPanel.jsx";
 import { getStoredUser, logout, clearSession } from "../../services/authService.js";
 
 /**
@@ -41,10 +43,11 @@ import { getStoredUser, logout, clearSession } from "../../services/authService.
  * Senior can never see another Senior's information by tampering with
  * the URL, because there is no id in this URL or request to tamper with.
  *
- * Pension, Benefits, Applications, Announcements, and Activities have no
- * backend module yet (see 41.J in the response below) — those sections
- * render honest, friendly empty states instead of invented data, and are
- * wired to swap in real data the moment those modules exist.
+ * Pension and Benefits & Assistance have real backend modules (see
+ * PensionPanel.jsx / BenefitsPanel.jsx / ApplicationsPanel.jsx).
+ * Announcements and Activities have no backend module yet — those
+ * sections render honest, friendly empty states instead of invented
+ * data, and are wired to swap in real data the moment those modules exist.
  */
 
 const COLORS = {
@@ -555,22 +558,12 @@ export default function SeniorDashboard() {
 
             {/* ---------- My Benefits ---------- */}
             <Section id="benefits" icon={HandHeart} title="My Benefits" t={t}>
-              <EmptyState
-                icon={HandHeart}
-                title="No benefits information yet."
-                message="Assistance programs you're eligible for, such as financial assistance, will appear here once your barangay makes them available."
-                t={t}
-              />
+              <BenefitsPanel t={t} />
             </Section>
 
             {/* ---------- My Applications ---------- */}
             <Section id="applications" icon={ClipboardList} title="My Applications" t={t}>
-              <EmptyState
-                icon={ClipboardList}
-                title="No applications yet."
-                message="When you apply for a SENIORCARE program, your applications will appear here."
-                t={t}
-              />
+              <ApplicationsPanel t={t} />
             </Section>
 
             {/* ---------- Announcements ---------- */}
