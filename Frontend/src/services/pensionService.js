@@ -61,3 +61,12 @@ export async function bookClaimingSlot({ scheduleId, slotId }) {
     throw toApiError(err);
   }
 }
+
+export async function cancelClaimingBooking(claimId) {
+  try {
+    const res = await api.post(`/pension-claims/${claimId}/cancel`);
+    return res.data?.data;
+  } catch (err) {
+    throw toApiError(err);
+  }
+}

@@ -271,22 +271,33 @@ test("staff can verify a valid QR claiming pass exactly once", async () => {
     slotId: schedule.slots[0]._id.toString(),
   });
 
-  const verified = await claimService.verifyClaimByToken(staff, claim.qrToken);
-  expect(verified.status).toBe("CLAIMED");
-  expect(verified.claimedAt).toBeTruthy();
-  expect(verified.verifiedBy.toString()).toBe(staff.id);
+  // Step 1: resolving the token must NOT change status by itself.
+  const resolved = await claimService.resolveClaimByToken(staff, claim.qrToken);
+  expect(resolved.status).toBe("SCHEDULED");
+  const stillScheduled = await claimService.getMyUpcomingClaim(senior.userId);
+  expect(stillScheduled.status).toBe("SCHEDULED");
 
-  await expect(claimService.verifyClaimByToken(staff, claim.qrToken)).rejects.toMatchObject({ statusCode: 409 });
+  // Step 2: explicit confirmation is what actually claims it.
+  const confirmed = await claimService.confirmClaim(staff, claim.qrToken);
+  expect(confirmed.status).toBe("CLAIMED");
+  expect(confirmed.claimedAt).toBeTruthy();
+  expect(confirmed.verifiedBy.toString()).toBe(staff.id);
+
+  await expect(claimService.resolveClaimByToken(staff, claim.qrToken)).rejects.toMatchObject({ statusCode: 409 });
+  await expect(claimService.confirmClaim(staff, claim.qrToken)).rejects.toMatchObject({ statusCode: 409 });
 });
 
 test("an invalid QR token is rejected safely", async () => {
   const staff = await makeStaff(barangayA);
-  await expect(claimService.verifyClaimByToken(staff, "not-a-real-token")).rejects.toMatchObject({
+  await expect(claimService.resolveClaimByToken(staff, "not-a-real-token")).rejects.toMatchObject({
+    statusCode: 404,
+  });
+  await expect(claimService.confirmClaim(staff, "not-a-real-token")).rejects.toMatchObject({
     statusCode: 404,
   });
 });
 
-test("staff from another barangay cannot verify a claim that isn't theirs", async () => {
+test("staff from another barangay cannot resolve or confirm a claim that isn't theirs", async () => {
   const senior = await makeActiveSenior({ accountEmail: "verify2@example.com", barangayId: barangayA._id.toString() });
   const staffA = await makeStaff(barangayA);
   const staffB = await makeStaff(barangayB);
@@ -297,7 +308,96 @@ test("staff from another barangay cannot verify a claim that isn't theirs", asyn
     slotId: schedule.slots[0]._id.toString(),
   });
 
-  await expect(claimService.verifyClaimByToken(staffB, claim.qrToken)).rejects.toMatchObject({ statusCode: 403 });
+  await expect(claimService.resolveClaimByToken(staffB, claim.qrToken)).rejects.toMatchObject({ statusCode: 403 });
+  await expect(claimService.confirmClaim(staffB, claim.qrToken)).rejects.toMatchObject({ statusCode: 403 });
+});
+
+test("a senior can cancel their own upcoming booking and the slot capacity is released", async () => {
+  const senior = await makeActiveSenior({ accountEmail: "cancel1@example.com" });
+  const staff = await makeStaff(barangayA);
+  await pensionService.createPension(staff, pensionInput(senior.seniorId));
+  const schedule = await makeScheduleWithSlot(staff, 1);
+  const claim = await claimService.bookSlot(senior.userId, {
+    scheduleId: schedule._id.toString(),
+    slotId: schedule.slots[0]._id.toString(),
+  });
+
+  const cancelled = await claimService.cancelClaim(senior.userId, claim._id.toString());
+  expect(cancelled.status).toBe("CANCELLED");
+  expect(cancelled.cancelledAt).toBeTruthy();
+
+  const refreshedSchedule = await scheduleService.getScheduleById(schedule._id.toString(), staff);
+  const slot = refreshedSchedule.slots.id(schedule.slots[0]._id);
+  expect(slot.bookedCount).toBe(0);
+  expect(slot.availableCount).toBe(1);
+  expect(slot.status).toBe("AVAILABLE");
+
+  // Double-cancel must not double-release capacity or succeed again.
+  await expect(claimService.cancelClaim(senior.userId, claim._id.toString())).rejects.toMatchObject({
+    statusCode: 409,
+  });
+  const scheduleAfterRetry = await scheduleService.getScheduleById(schedule._id.toString(), staff);
+  expect(scheduleAfterRetry.slots.id(schedule.slots[0]._id).availableCount).toBe(1);
+});
+
+test("a claimed booking cannot be cancelled", async () => {
+  const senior = await makeActiveSenior({ accountEmail: "cancel2@example.com" });
+  const staff = await makeStaff(barangayA);
+  await pensionService.createPension(staff, pensionInput(senior.seniorId));
+  const schedule = await makeScheduleWithSlot(staff, 5);
+  const claim = await claimService.bookSlot(senior.userId, {
+    scheduleId: schedule._id.toString(),
+    slotId: schedule.slots[0]._id.toString(),
+  });
+  await claimService.confirmClaim(staff, claim.qrToken);
+
+  await expect(claimService.cancelClaim(senior.userId, claim._id.toString())).rejects.toMatchObject({
+    statusCode: 409,
+  });
+});
+
+test("a senior cannot cancel another senior's booking", async () => {
+  const seniorA = await makeActiveSenior({ accountEmail: "cancel3a@example.com" });
+  const seniorB = await makeActiveSenior({ accountEmail: "cancel3b@example.com" });
+  const staff = await makeStaff(barangayA);
+  await pensionService.createPension(staff, pensionInput(seniorA.seniorId));
+  const schedule = await makeScheduleWithSlot(staff, 5);
+  const claim = await claimService.bookSlot(seniorA.userId, {
+    scheduleId: schedule._id.toString(),
+    slotId: schedule.slots[0]._id.toString(),
+  });
+
+  await expect(claimService.cancelClaim(seniorB.userId, claim._id.toString())).rejects.toMatchObject({
+    statusCode: 404,
+  });
+});
+
+test("a SCHEDULED claim whose claiming window has passed is swept to MISSED and can no longer be claimed or cancelled", async () => {
+  const senior = await makeActiveSenior({ accountEmail: "missed1@example.com" });
+  const staff = await makeStaff(barangayA);
+  await pensionService.createPension(staff, pensionInput(senior.seniorId));
+  const schedule = await makeScheduleWithSlot(staff, 5);
+  const claim = await claimService.bookSlot(senior.userId, {
+    scheduleId: schedule._id.toString(),
+    slotId: schedule.slots[0]._id.toString(),
+  });
+
+  // Simulate the claiming window having already passed.
+  const PensionClaimModel = (await import("../src/models/PensionClaim.js")).default;
+  await PensionClaimModel.updateOne(
+    { _id: claim._id },
+    { $set: { scheduledDate: new Date(Date.now() - 24 * 60 * 60 * 1000) } }
+  );
+
+  const history = await claimService.getMyClaimHistory(senior.userId);
+  expect(history).toHaveLength(1);
+  expect(history[0].status).toBe("MISSED");
+  expect(await claimService.getMyUpcomingClaim(senior.userId)).toBeNull();
+
+  await expect(claimService.resolveClaimByToken(staff, claim.qrToken)).rejects.toMatchObject({ statusCode: 409 });
+  await expect(claimService.cancelClaim(senior.userId, claim._id.toString())).rejects.toMatchObject({
+    statusCode: 409,
+  });
 });
 
 test("claiming history reflects a claimed slot and stays empty before any claim", async () => {

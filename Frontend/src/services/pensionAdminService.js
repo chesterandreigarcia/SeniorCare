@@ -103,9 +103,22 @@ export async function listClaims({ scheduleId, date } = {}) {
   }
 }
 
-export async function verifyClaim(qrToken) {
+// Step 1: resolve a scanned/entered QR token into claim details for
+// review. This NEVER marks the claim as claimed — see confirmClaim().
+export async function resolveClaim(qrToken) {
   try {
     const res = await api.post("/pension-claims/verify", { qrToken });
+    return res.data?.data;
+  } catch (err) {
+    throw toApiError(err);
+  }
+}
+
+// Step 2: Staff explicitly confirms the claim just resolved. This is the
+// only call that actually transitions the claim to CLAIMED.
+export async function confirmClaim(qrToken) {
+  try {
+    const res = await api.post("/pension-claims/confirm", { qrToken });
     return res.data?.data;
   } catch (err) {
     throw toApiError(err);

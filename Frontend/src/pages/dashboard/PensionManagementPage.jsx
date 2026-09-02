@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { Wallet, Calendar, QrCode, Plus, X, Loader2, Search, CheckCircle2, AlertCircle, MapPin } from "lucide-react";
+import { Wallet, Calendar, QrCode, Plus, X, Loader2, Search, CheckCircle2, AlertCircle, MapPin, Camera } from "lucide-react";
 import DashboardLayout from "./DashboardLayout.jsx";
+import QrScannerDialog from "./QrScannerDialog.jsx";
 import { COLORS } from "./theme.js";
 import { getStoredUser } from "../../services/authService.js";
 import {
@@ -13,8 +14,16 @@ import {
   createSchedule,
   closeSchedule,
   listClaims,
-  verifyClaim,
+  resolveClaim,
+  confirmClaim,
 } from "../../services/pensionAdminService.js";
+
+const CLAIM_STATUS_STYLE = {
+  SCHEDULED: { label: "⏳ Scheduled", color: COLORS.baltic },
+  CLAIMED: { label: "✓ Claimed", color: "#2f7d43" },
+  MISSED: { label: "✕ Missed", color: "#b8452f" },
+  CANCELLED: { label: "✕ Cancelled", color: "#64748b" },
+};
 
 const PENSION_TYPE_OPTIONS = [
   { value: "GOVERNMENT_PENSION", label: "Government Pension" },
@@ -557,12 +566,83 @@ function SchedulesTab() {
 
 // ---------------- Verify Claims tab ----------------
 
+// Claim information card shown after a QR is resolved, before Staff
+// confirms. Uses only the fields the existing backend actually returns.
+function ClaimReviewCard({ claim, onConfirm, onDismiss, confirming }) {
+  return (
+    <div className="rounded-lg border-2 p-4 mb-6" style={{ borderColor: COLORS.sky, backgroundColor: COLORS.sky + "1f" }}>
+      <p className="text-sm font-bold uppercase tracking-wide mb-3" style={{ color: COLORS.cerulean }}>
+        Claiming Verification
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+        <div>
+          <p className="text-xs font-semibold uppercase" style={{ color: COLORS.cerulean }}>Senior Citizen</p>
+          <p className="text-sm font-bold" style={{ color: COLORS.yale }}>
+            {claim.seniorId?.firstName} {claim.seniorId?.lastName}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs font-semibold uppercase" style={{ color: COLORS.cerulean }}>Senior Citizen ID</p>
+          <p className="text-sm font-bold" style={{ color: COLORS.yale }}>{claim.seniorId?.seniorCitizenId || "—"}</p>
+        </div>
+        <div>
+          <p className="text-xs font-semibold uppercase" style={{ color: COLORS.cerulean }}>Claiming Date</p>
+          <p className="text-sm font-bold" style={{ color: COLORS.yale }}>{formatDate(claim.scheduledDate)}</p>
+        </div>
+        <div>
+          <p className="text-xs font-semibold uppercase" style={{ color: COLORS.cerulean }}>Claiming Time</p>
+          <p className="text-sm font-bold" style={{ color: COLORS.yale }}>
+            {claim.scheduledStartTime} – {claim.scheduledEndTime}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs font-semibold uppercase" style={{ color: COLORS.cerulean }}>Location</p>
+          <p className="text-sm font-bold" style={{ color: COLORS.yale }}>{claim.location}</p>
+        </div>
+        <div>
+          <p className="text-xs font-semibold uppercase" style={{ color: COLORS.cerulean }}>Claim Status</p>
+          <p className="text-sm font-bold" style={{ color: (CLAIM_STATUS_STYLE[claim.status] || CLAIM_STATUS_STYLE.SCHEDULED).color }}>
+            {claim.status}
+          </p>
+        </div>
+      </div>
+      <p className="text-xs text-slate-600 mb-3">
+        Please confirm the Senior's identity in person before completing this claim.
+      </p>
+      <div className="flex gap-3">
+        <button
+          type="button"
+          onClick={onConfirm}
+          disabled={confirming}
+          className="inline-flex items-center gap-2 rounded-md px-5 py-2.5 font-semibold text-white disabled:opacity-60"
+          style={{ backgroundColor: "#2f7d43" }}
+        >
+          {confirming ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+          {confirming ? "Confirming..." : "Confirm Claim"}
+        </button>
+        <button
+          type="button"
+          onClick={onDismiss}
+          disabled={confirming}
+          className="inline-flex items-center gap-2 rounded-md px-5 py-2.5 font-semibold border disabled:opacity-60"
+          style={{ borderColor: COLORS.alabaster, color: COLORS.yale }}
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function VerifyTab() {
   const [claims, setClaims] = useState([]);
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState("");
-  const [verifying, setVerifying] = useState(false);
+  const [resolving, setResolving] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [pendingClaim, setPendingClaim] = useState(null); // resolved, awaiting Staff confirmation
   const [result, setResult] = useState(null);
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -571,37 +651,93 @@ function VerifyTab() {
 
   useEffect(load, [load]);
 
-  const handleVerify = async (e) => {
+  const resolveToken = async (qrToken) => {
+    setResolving(true);
+    setResult(null);
+    setPendingClaim(null);
+    try {
+      // Existing backend endpoint — read-only, never claims by itself.
+      const claim = await resolveClaim(qrToken);
+      setPendingClaim({ ...claim, _qrToken: qrToken });
+    } catch (err) {
+      setResult({ ok: false, message: err.message || "Invalid QR code." });
+    } finally {
+      setResolving(false);
+    }
+  };
+
+  const handleManualSubmit = (e) => {
     e.preventDefault();
     if (!token.trim()) return;
-    setVerifying(true);
-    setResult(null);
+    resolveToken(token.trim());
+    setToken("");
+  };
+
+  const handleQrDetected = (payload) => {
+    setScannerOpen(false);
+    resolveToken(payload);
+  };
+
+  const handleConfirm = async () => {
+    if (!pendingClaim) return;
+    setConfirming(true);
     try {
-      const claim = await verifyClaim(token.trim());
-      setResult({ ok: true, claim, message: "Claim confirmed." });
-      setToken("");
+      const claim = await confirmClaim(pendingClaim._qrToken);
+      setResult({
+        ok: true,
+        message: `Claim confirmed for ${claim.seniorId?.firstName || ""} ${claim.seniorId?.lastName || ""}`.trim() + ".",
+      });
+      setPendingClaim(null);
       load();
     } catch (err) {
-      setResult({ ok: false, message: err.message || "Invalid claiming pass." });
+      setResult({ ok: false, message: err.message || "This claiming stub could not be confirmed." });
+      setPendingClaim(null);
     } finally {
-      setVerifying(false);
+      setConfirming(false);
     }
   };
 
   return (
     <div>
-      <form onSubmit={handleVerify} className="bg-white rounded-lg border p-4 mb-6 flex flex-col sm:flex-row gap-3" style={{ borderColor: COLORS.alabaster }}>
-        <input
-          value={token}
-          onChange={(e) => setToken(e.target.value)}
-          placeholder="Scan or paste the claiming pass QR token"
-          className="flex-1 rounded-md border px-3.5 py-2.5 text-sm focus:outline-none"
-          style={{ borderColor: COLORS.alabaster }}
-        />
-        <button type="submit" disabled={verifying} className="inline-flex items-center justify-center gap-2 rounded-md px-5 py-2.5 font-semibold text-white disabled:opacity-60" style={{ backgroundColor: COLORS.baltic }}>
-          <QrCode className="w-4 h-4" /> {verifying ? "Verifying..." : "Verify"}
+      <div className="bg-white rounded-lg border p-4 mb-6 flex flex-col sm:flex-row gap-3" style={{ borderColor: COLORS.alabaster }}>
+        <button
+          type="button"
+          onClick={() => setScannerOpen(true)}
+          className="inline-flex items-center justify-center gap-2 rounded-md px-5 py-2.5 font-semibold text-white"
+          style={{ backgroundColor: COLORS.yale }}
+        >
+          <Camera className="w-4 h-4" /> Scan QR
         </button>
-      </form>
+        <form onSubmit={handleManualSubmit} className="flex-1 flex flex-col sm:flex-row gap-3">
+          <input
+            value={token}
+            onChange={(e) => setToken(e.target.value)}
+            placeholder="Or paste the claiming pass QR token"
+            className="flex-1 rounded-md border px-3.5 py-2.5 text-sm focus:outline-none"
+            style={{ borderColor: COLORS.alabaster }}
+          />
+          <button type="submit" disabled={resolving} className="inline-flex items-center justify-center gap-2 rounded-md px-5 py-2.5 font-semibold text-white disabled:opacity-60" style={{ backgroundColor: COLORS.baltic }}>
+            <QrCode className="w-4 h-4" /> {resolving ? "Checking..." : "Check"}
+          </button>
+        </form>
+      </div>
+
+      {scannerOpen && <QrScannerDialog onDetected={handleQrDetected} onClose={() => setScannerOpen(false)} />}
+
+      {resolving && (
+        <div className="rounded-md border p-3 mb-6 text-sm flex items-center gap-2" style={{ backgroundColor: "#f1f5f9", borderColor: COLORS.alabaster, color: COLORS.yale }}>
+          <Loader2 className="w-4 h-4 animate-spin shrink-0" /> Validating claim...
+        </div>
+      )}
+
+      {pendingClaim && (
+        <ClaimReviewCard
+          claim={pendingClaim}
+          onConfirm={handleConfirm}
+          onDismiss={() => setPendingClaim(null)}
+          confirming={confirming}
+        />
+      )}
 
       {result && (
         <div
@@ -613,9 +749,7 @@ function VerifyTab() {
           }}
         >
           {result.ok ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
-          {result.ok
-            ? `${result.message} ${result.claim.seniorId?.firstName || ""} ${result.claim.seniorId?.lastName || ""}`.trim()
-            : result.message}
+          {result.message}
         </div>
       )}
 
@@ -635,15 +769,16 @@ function VerifyTab() {
               </tr>
             </thead>
             <tbody>
-              {claims.map((c) => (
-                <tr key={c._id} className="border-b last:border-0" style={{ borderColor: COLORS.alabaster }}>
-                  <td className="px-4 py-3 font-medium" style={{ color: COLORS.yale }}>{c.seniorId?.lastName}, {c.seniorId?.firstName}</td>
-                  <td className="px-4 py-3">{c.scheduledStartTime} – {c.scheduledEndTime}</td>
-                  <td className="px-4 py-3 font-semibold" style={{ color: c.status === "CLAIMED" ? "#2f7d43" : COLORS.baltic }}>
-                    {c.status === "CLAIMED" ? "✓ Claimed" : "⏳ Scheduled"}
-                  </td>
-                </tr>
-              ))}
+              {claims.map((c) => {
+                const display = CLAIM_STATUS_STYLE[c.status] || CLAIM_STATUS_STYLE.SCHEDULED;
+                return (
+                  <tr key={c._id} className="border-b last:border-0" style={{ borderColor: COLORS.alabaster }}>
+                    <td className="px-4 py-3 font-medium" style={{ color: COLORS.yale }}>{c.seniorId?.lastName}, {c.seniorId?.firstName}</td>
+                    <td className="px-4 py-3">{c.scheduledStartTime} – {c.scheduledEndTime}</td>
+                    <td className="px-4 py-3 font-semibold" style={{ color: display.color }}>{display.label}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

@@ -46,9 +46,31 @@ export async function listClaims(req, res, next) {
   }
 }
 
-export async function verifyClaim(req, res, next) {
+// Step 1: resolve a scanned/entered QR token to claim info for Staff to
+// review. Never changes the claim's status — see pensionClaim.service.js.
+export async function resolveClaim(req, res, next) {
   try {
-    const claim = await claimService.verifyClaimByToken(req.user, req.validatedBody.qrToken);
+    const claim = await claimService.resolveClaimByToken(req.user, req.validatedBody.qrToken);
+    res.status(200).json({ success: true, data: claim });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// Step 2: Staff explicitly confirms the claim that was just resolved,
+// which is the only place a claim actually becomes CLAIMED.
+export async function confirmClaim(req, res, next) {
+  try {
+    const claim = await claimService.confirmClaim(req.user, req.validatedBody.qrToken);
+    res.status(200).json({ success: true, data: claim });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function cancelClaim(req, res, next) {
+  try {
+    const claim = await claimService.cancelClaim(req.user.id, req.params.id);
     res.status(200).json({ success: true, data: claim });
   } catch (err) {
     next(err);

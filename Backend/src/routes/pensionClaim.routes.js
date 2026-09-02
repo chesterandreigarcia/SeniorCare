@@ -16,9 +16,13 @@ router.post("/", authenticate, seniorOnly, validateBody(bookSlotSchema), claimCo
 router.get("/me/upcoming", authenticate, seniorOnly, claimController.getMyUpcomingClaim);
 router.get("/me/history", authenticate, seniorOnly, claimController.getMyClaimHistory);
 router.get("/me/:id/qr", authenticate, seniorOnly, claimController.getMyClaimQr);
+router.post("/:id/cancel", authenticate, seniorOnly, claimController.cancelClaim);
 
 // Barangay Staff / Admin / LGU-OSCA.
 router.get("/", authenticate, staffOrAbove, claimController.listClaims);
-router.post("/verify", authenticate, staffOrAbove, validateBody(verifyClaimSchema), claimController.verifyClaim);
+// Step 1: resolve the scanned/entered QR token — read-only, for review.
+router.post("/verify", authenticate, staffOrAbove, validateBody(verifyClaimSchema), claimController.resolveClaim);
+// Step 2: explicit Staff confirmation — the only path that sets CLAIMED.
+router.post("/confirm", authenticate, staffOrAbove, validateBody(verifyClaimSchema), claimController.confirmClaim);
 
 export default router;

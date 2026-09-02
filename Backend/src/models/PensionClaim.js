@@ -30,6 +30,16 @@ const pensionClaimSchema = new mongoose.Schema(
 
     claimedAt: { type: Date, default: null },
     verifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+
+    // Set when a Senior cancels their own upcoming booking (see
+    // pensionClaim.service.js#cancelClaim). Mirrors the claimedAt/verifiedBy
+    // pattern above rather than introducing a separate audit collection.
+    cancelledAt: { type: Date, default: null },
+    cancelledBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+
+    // Set when the claiming window passes without the claim being
+    // claimed (see utils/claimWindow.js#sweepMissedClaims).
+    missedAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

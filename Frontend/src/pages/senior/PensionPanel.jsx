@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Wallet, Calendar, MapPin, Clock, QrCode, X, Loader2, AlertCircle, RefreshCw } from "lucide-react";
+import { Wallet, Calendar, MapPin, Clock, QrCode, X, Loader2, AlertCircle, RefreshCw, Ban } from "lucide-react";
 import {
   getMyPension,
   getMyBarangaySchedules,
@@ -7,6 +7,7 @@ import {
   getMyClaimHistory,
   getMyClaimQr,
   bookClaimingSlot,
+  cancelClaimingBooking,
 } from "../../services/pensionService.js";
 
 const COLORS = {
@@ -136,6 +137,50 @@ function QrModal({ claim, onClose, t }) {
   );
 }
 
+function CancelBookingDialog({ claim, onKeep, onConfirm, cancelling, error, t }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="cancel-booking-title">
+      <div className="bg-white rounded-2xl max-w-sm w-full p-6">
+        <h3 id="cancel-booking-title" className={`${t.cardTitle} font-extrabold text-center mb-3`} style={{ color: COLORS.yale }}>
+          Cancel Booking
+        </h3>
+        <p className={`${t.body} text-center mb-1`} style={{ color: COLORS.yale }}>
+          Are you sure you want to cancel this booking?
+        </p>
+        <p className={`${t.small} text-center text-slate-600 mb-4`}>
+          {formatDate(claim.scheduledDate)} · {claim.scheduledStartTime} – {claim.scheduledEndTime}
+        </p>
+        {error && (
+          <p className={`${t.small} font-semibold text-center mb-3`} style={{ color: "#b8452f" }}>
+            {error}
+          </p>
+        )}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <button
+            type="button"
+            onClick={onKeep}
+            disabled={cancelling}
+            className={`${t.body} flex-1 font-bold rounded-md px-4 py-3 border-2 focus:outline-none focus-visible:ring-4 disabled:opacity-60`}
+            style={{ borderColor: COLORS.baltic, color: COLORS.baltic }}
+          >
+            Keep Booking
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={cancelling}
+            className={`${t.body} flex-1 font-bold text-white rounded-md px-4 py-3 focus:outline-none focus-visible:ring-4 disabled:opacity-60 flex items-center justify-center gap-2`}
+            style={{ backgroundColor: "#b8452f" }}
+          >
+            {cancelling && <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />}
+            {cancelling ? "Cancelling..." : "Cancel Booking"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function PensionPanel({ t }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -146,6 +191,9 @@ export default function PensionPanel({ t }) {
   const [bookingSlotId, setBookingSlotId] = useState(null);
   const [bookingError, setBookingError] = useState(null);
   const [qrClaim, setQrClaim] = useState(null);
+  const [cancelTarget, setCancelTarget] = useState(null);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -176,6 +224,21 @@ export default function PensionPanel({ t }) {
   useEffect(() => {
     load();
   }, [load]);
+
+  const handleCancelBooking = async () => {
+    if (!cancelTarget) return;
+    setCancelling(true);
+    setCancelError(null);
+    try {
+      await cancelClaimingBooking(cancelTarget._id);
+      setCancelTarget(null);
+      await load();
+    } catch (err) {
+      setCancelError(err.message || "This booking could no longer be cancelled.");
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   const handleBook = async (scheduleId, slotId) => {
     setBookingSlotId(slotId);
@@ -278,14 +341,27 @@ export default function PensionPanel({ t }) {
           <p className={`${t.small} font-bold mt-2`} style={{ color: CLAIM_STATUS_DISPLAY.SCHEDULED.color }}>
             {CLAIM_STATUS_DISPLAY.SCHEDULED.label}
           </p>
-          <button
-            type="button"
-            onClick={() => setQrClaim(upcomingClaim)}
-            className={`${t.button} inline-flex items-center gap-2 font-bold text-white rounded-md px-5 py-3 mt-4 focus:outline-none focus-visible:ring-4`}
-            style={{ backgroundColor: COLORS.baltic }}
-          >
-            <QrCode className="w-5 h-5" aria-hidden="true" /> View QR Pass
-          </button>
+          <div className="flex flex-wrap gap-3 mt-4">
+            <button
+              type="button"
+              onClick={() => setQrClaim(upcomingClaim)}
+              className={`${t.button} inline-flex items-center gap-2 font-bold text-white rounded-md px-5 py-3 focus:outline-none focus-visible:ring-4`}
+              style={{ backgroundColor: COLORS.baltic }}
+            >
+              <QrCode className="w-5 h-5" aria-hidden="true" /> View QR Pass
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setCancelError(null);
+                setCancelTarget(upcomingClaim);
+              }}
+              className={`${t.button} inline-flex items-center gap-2 font-bold rounded-md px-5 py-3 border-2 focus:outline-none focus-visible:ring-4`}
+              style={{ borderColor: "#b8452f", color: "#b8452f" }}
+            >
+              <Ban className="w-5 h-5" aria-hidden="true" /> Cancel Booking
+            </button>
+          </div>
         </div>
       ) : (
         <div>
@@ -391,6 +467,16 @@ export default function PensionPanel({ t }) {
       </div>
 
       {qrClaim && <QrModal claim={qrClaim} onClose={() => setQrClaim(null)} t={t} />}
+      {cancelTarget && (
+        <CancelBookingDialog
+          claim={cancelTarget}
+          onKeep={() => setCancelTarget(null)}
+          onConfirm={handleCancelBooking}
+          cancelling={cancelling}
+          error={cancelError}
+          t={t}
+        />
+      )}
     </div>
   );
 }
