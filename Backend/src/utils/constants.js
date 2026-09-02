@@ -57,3 +57,40 @@ export const RELATIONSHIP_TYPES = Object.freeze({
 // Adjust to the organization's actual policy — kept as a single
 // source of truth rather than scattered magic numbers.
 export const MINIMUM_SENIOR_AGE = 60;
+
+// ---- Pension Management ----
+
+export const PENSION_TYPES = Object.freeze({
+  GOVERNMENT_PENSION: "GOVERNMENT_PENSION",
+  SOCIAL_PENSION: "SOCIAL_PENSION",
+  OTHER: "OTHER",
+});
+
+export const PENSION_FREQUENCY = Object.freeze({
+  MONTHLY: "MONTHLY",
+  QUARTERLY: "QUARTERLY",
+  ANNUAL: "ANNUAL",
+});
+
+export const PENSION_STATUS = Object.freeze({
+  ACTIVE: "ACTIVE",
+  INACTIVE: "INACTIVE",
+});
+
+export const SCHEDULE_STATUS = Object.freeze({
+  OPEN: "OPEN",
+  CLOSED: "CLOSED",
+});
+
+export const SLOT_STATUS = Object.freeze({
+  AVAILABLE: "AVAILABLE",
+  FULL: "FULL",
+  CLOSED: "CLOSED",
+});
+
+export const CLAIM_STATUS = Object.freeze({
+  SCHEDULED: "SCHEDULED",
+  CLAIMED: "CLAIMED",
+  MISSED: "MISSED",
+  CANCELLED: "CANCELLED",
+});

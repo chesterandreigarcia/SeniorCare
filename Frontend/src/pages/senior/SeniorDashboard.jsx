@@ -25,6 +25,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { getMyProfile } from "../../services/seniorService.js";
+import PensionPanel from "./PensionPanel.jsx";
 import { getStoredUser, logout, clearSession } from "../../services/authService.js";
 
 /**
@@ -549,12 +550,7 @@ export default function SeniorDashboard() {
 
             {/* ---------- My Pension ---------- */}
             <Section id="pension" icon={Wallet} title="My Pension" t={t}>
-              <EmptyState
-                icon={Wallet}
-                title="Pension information is not available yet."
-                message="Your barangay will update your pension information when available."
-                t={t}
-              />
+              <PensionPanel t={t} />
             </Section>
 
             {/* ---------- My Benefits ---------- */}

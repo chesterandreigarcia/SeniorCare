@@ -6,6 +6,7 @@ import VerificationDashboard from "./pages/dashboard/VerificationDashboard.jsx";
 import SeniorReviewPage from "./pages/dashboard/SeniorReviewPage.jsx";
 import BarangayManagementPage from "./pages/dashboard/BarangayManagementPage.jsx";
 import StaffManagementPage from "./pages/dashboard/StaffManagementPage.jsx";
+import PensionManagementPage from "./pages/dashboard/PensionManagementPage.jsx";
 import SeniorDashboard from "./pages/senior/SeniorDashboard.jsx";
 import ProtectedRoute from "./routes/ProtectedRoute.jsx";
 // import Dashboard from "./pages/Dashboard";
@@ -66,6 +67,16 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={VERIFICATION_ROLES}>
               <SeniorReviewPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Barangay/Admin/LGU-OSCA pension management — same role set as verification. */}
+        <Route
+          path="/pension-management"
+          element={
+            <ProtectedRoute allowedRoles={VERIFICATION_ROLES}>
+              <PensionManagementPage />
             </ProtectedRoute>
           }
         />
