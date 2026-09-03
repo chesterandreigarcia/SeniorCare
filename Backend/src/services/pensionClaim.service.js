@@ -5,10 +5,11 @@ import PensionSchedule from "../models/PensionSchedule.js";
 import PensionClaim from "../models/PensionClaim.js";
 import Pension from "../models/Pension.js";
 import Senior from "../models/Senior.js";
-import { CLAIM_STATUS, SCHEDULE_STATUS } from "../utils/constants.js";
+import { CLAIM_STATUS, SCHEDULE_STATUS, NOTIFICATION_TYPE } from "../utils/constants.js";
 import { NotFoundError, ConflictError, ValidationError, AuthorizationError } from "../utils/errors.js";
 import { assertCanAccessBarangay } from "../utils/barangayScope.js";
 import { sweepMissedClaims, sweepMissedClaim } from "../utils/claimWindow.js";
+import { createNotification } from "./notification.service.js";
 
 // Human-readable messages for claims that can no longer be claimed —
 // shared by the QR resolve/confirm paths so Staff always see a clear,
@@ -27,6 +28,26 @@ function claimStatusMessage(status) {
 }
 
 const SENIOR_SUMMARY_FIELDS = "firstName lastName seniorCitizenId";
+
+/**
+ * Notifies the Senior who owns a claim — resolved via the claim's own
+ * seniorId, never trusted from anywhere else. Called only after the
+ * relevant write has already committed (outside any transaction/session),
+ * matching the session-safety rule documented in benefitApplication.service.js.
+ */
+async function notifyClaimOwner(claim, { eventType, title, message }) {
+  const senior = await Senior.findById(claim.seniorId).select("userId");
+  if (!senior) return;
+  await createNotification({
+    recipientId: senior.userId,
+    type: NOTIFICATION_TYPE.PENSION,
+    eventType,
+    title,
+    message,
+    relatedEntityType: "PensionClaim",
+    relatedEntityId: claim._id,
+  });
+}
 
 /**
  * Books a claiming slot for the authenticated Senior (`userId` from the
@@ -256,6 +277,12 @@ export async function confirmClaim(requestingUser, qrToken) {
     const current = await PensionClaim.findById(claim._id);
     throw new ConflictError(claimStatusMessage(current.status), { status: current.status });
   }
+
+  await notifyClaimOwner(updated, {
+    eventType: "PENSION_CLAIM_CLAIMED",
+    title: "Pension Claimed",
+    message: "Your pension claim has been successfully completed.",
+  });
 
   return updated;
 }

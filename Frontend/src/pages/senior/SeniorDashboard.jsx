@@ -28,6 +28,9 @@ import { getMyProfile } from "../../services/seniorService.js";
 import PensionPanel from "./PensionPanel.jsx";
 import BenefitsPanel from "./BenefitsPanel.jsx";
 import ApplicationsPanel from "./ApplicationsPanel.jsx";
+import AnnouncementsPanel from "./AnnouncementsPanel.jsx";
+import NotificationsPanel from "./NotificationsPanel.jsx";
+import NotificationBell from "../../components/NotificationBell.jsx";
 import { getStoredUser, logout, clearSession } from "../../services/authService.js";
 
 /**
@@ -43,11 +46,11 @@ import { getStoredUser, logout, clearSession } from "../../services/authService.
  * Senior can never see another Senior's information by tampering with
  * the URL, because there is no id in this URL or request to tamper with.
  *
- * Pension and Benefits & Assistance have real backend modules (see
- * PensionPanel.jsx / BenefitsPanel.jsx / ApplicationsPanel.jsx).
- * Announcements and Activities have no backend module yet — those
- * sections render honest, friendly empty states instead of invented
- * data, and are wired to swap in real data the moment those modules exist.
+ * Pension, Benefits & Assistance, Announcements, and Notifications all
+ * have real backend modules (see PensionPanel.jsx / BenefitsPanel.jsx /
+ * ApplicationsPanel.jsx / AnnouncementsPanel.jsx / NotificationsPanel.jsx).
+ * Activities has no backend module yet — that section renders an honest
+ * empty state instead of invented data.
  */
 
 const COLORS = {
@@ -308,14 +311,7 @@ export default function SeniorDashboard() {
           </nav>
 
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              aria-label="Notifications"
-              onClick={() => scrollToSection("notifications")}
-              className="hidden sm:flex w-11 h-11 rounded-full items-center justify-center hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
-            >
-              <Bell className="w-6 h-6 text-white" aria-hidden="true" />
-            </button>
+            <NotificationBell colors={COLORS} />
             <button
               type="button"
               onClick={handleLogout}
@@ -568,12 +564,7 @@ export default function SeniorDashboard() {
 
             {/* ---------- Announcements ---------- */}
             <Section id="announcements" icon={Megaphone} title="Announcements" t={t}>
-              <EmptyState
-                icon={Megaphone}
-                title="No announcements right now."
-                message="Barangay notices, pension schedules, and program updates will appear here."
-                t={t}
-              />
+              <AnnouncementsPanel t={t} />
             </Section>
 
             {/* ---------- Activities ---------- */}
@@ -588,12 +579,7 @@ export default function SeniorDashboard() {
 
             {/* ---------- Notifications ---------- */}
             <Section id="notifications" icon={Bell} title="Notifications" t={t}>
-              <EmptyState
-                icon={Bell}
-                title="You're all caught up."
-                message="Updates about your applications, pension, and account will appear here."
-                t={t}
-              />
+              <NotificationsPanel t={t} />
             </Section>
 
             {/* ---------- Profile ---------- */}

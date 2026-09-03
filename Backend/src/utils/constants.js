@@ -124,3 +124,53 @@ export const APPLICATION_STATUS = Object.freeze({
   CLAIMED: "CLAIMED",
   REJECTED: "REJECTED",
 });
+
+// ---- Announcements & Notifications ----
+
+export const ANNOUNCEMENT_CATEGORY = Object.freeze({
+  GENERAL: "GENERAL",
+  PENSION: "PENSION",
+  BENEFITS: "BENEFITS",
+  ASSISTANCE: "ASSISTANCE",
+  REQUIREMENTS: "REQUIREMENTS",
+  PROGRAM: "PROGRAM",
+  BARANGAY: "BARANGAY",
+  ACTIVITY: "ACTIVITY",
+  IMPORTANT: "IMPORTANT",
+});
+
+export const ANNOUNCEMENT_STATUS = Object.freeze({
+  DRAFT: "DRAFT",
+  PUBLISHED: "PUBLISHED",
+  ARCHIVED: "ARCHIVED",
+});
+
+// Who an announcement is meant for. ALL means every authenticated,
+// active role (Senior/Guardian/Staff/Admin/LGU-OSCA all see it, still
+// subject to barangay scoping below) — it does NOT bypass barangay
+// scoping on its own. STAFF_ADMIN groups the internal-only audiences
+// (BARANGAY_STAFF/ADMIN/LGU_OSCA) since Seniors/Guardians must never
+// see staff-only announcements.
+export const TARGET_AUDIENCE = Object.freeze({
+  ALL: "ALL",
+  SENIOR_CITIZEN: "SENIOR_CITIZEN",
+  GUARDIAN: "GUARDIAN",
+  STAFF_ADMIN: "STAFF_ADMIN",
+});
+
+// Whether an announcement applies system-wide or only to specific
+// Barangay(s) — mirrors BenefitProgram.barangayIds' "empty = everyone"
+// convention rather than inventing a second scoping concept.
+export const ANNOUNCEMENT_SCOPE = Object.freeze({
+  SYSTEM_WIDE: "SYSTEM_WIDE",
+  BARANGAY: "BARANGAY",
+});
+
+export const NOTIFICATION_TYPE = Object.freeze({
+  ANNOUNCEMENT: "ANNOUNCEMENT",
+  PENSION: "PENSION",
+  BENEFIT: "BENEFIT",
+  DOCUMENT: "DOCUMENT",
+  APPLICATION: "APPLICATION",
+  SYSTEM: "SYSTEM",
+});

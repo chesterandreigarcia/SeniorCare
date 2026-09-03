@@ -8,6 +8,7 @@ import BarangayManagementPage from "./pages/dashboard/BarangayManagementPage.jsx
 import StaffManagementPage from "./pages/dashboard/StaffManagementPage.jsx";
 import PensionManagementPage from "./pages/dashboard/PensionManagementPage.jsx";
 import BenefitsManagementPage from "./pages/dashboard/BenefitsManagementPage.jsx";
+import AnnouncementsManagementPage from "./pages/dashboard/AnnouncementsManagementPage.jsx";
 import SeniorDashboard from "./pages/senior/SeniorDashboard.jsx";
 import ProtectedRoute from "./routes/ProtectedRoute.jsx";
 // import Dashboard from "./pages/Dashboard";
@@ -88,6 +89,16 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={VERIFICATION_ROLES}>
               <BenefitsManagementPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Barangay/Admin/LGU-OSCA Announcements management — same role set as verification. */}
+        <Route
+          path="/announcements-management"
+          element={
+            <ProtectedRoute allowedRoles={VERIFICATION_ROLES}>
+              <AnnouncementsManagementPage />
             </ProtectedRoute>
           }
         />

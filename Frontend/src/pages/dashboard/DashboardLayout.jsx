@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Heart, ClipboardCheck, LogOut, Menu, X, ShieldCheck, Building2, Users2, Wallet, HandHeart } from "lucide-react";
+import { Heart, ClipboardCheck, LogOut, Menu, X, ShieldCheck, Building2, Users2, Wallet, HandHeart, Megaphone } from "lucide-react";
 import { logout as apiLogout, clearSession, getStoredUser } from "../../services/authService.js";
+import NotificationBell from "../../components/NotificationBell.jsx";
 import { COLORS, FONT_STACK } from "./theme.js";
 
 const ROLE_LABELS = {
@@ -45,6 +46,12 @@ export default function DashboardLayout({ children, title, subtitle }) {
       icon: HandHeart,
       label: "Benefits & Assistance",
       active: location.pathname.startsWith("/benefits-management"),
+    },
+    {
+      to: "/announcements-management",
+      icon: Megaphone,
+      label: "Announcements",
+      active: location.pathname.startsWith("/announcements-management"),
     },
     ...(isAdmin
       ? [
@@ -103,7 +110,9 @@ export default function DashboardLayout({ children, title, subtitle }) {
             SENIORCARE
           </span>
         </div>
-        <div className="w-8" />
+        <div className="flex items-center">
+          <NotificationBell colors={COLORS} variant="dark" />
+        </div>
       </div>
 
       <div className="flex">
@@ -207,6 +216,9 @@ export default function DashboardLayout({ children, title, subtitle }) {
 
         {/* Main content */}
         <main className="flex-1 min-w-0 px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
+          <div className="hidden lg:flex justify-end mb-2">
+            <NotificationBell colors={COLORS} variant="dark" />
+          </div>
           {(title || subtitle) && (
             <div className="mb-6">
               {title && (

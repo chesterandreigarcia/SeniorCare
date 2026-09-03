@@ -15,6 +15,8 @@ import pensionScheduleRoutes from "./routes/pensionSchedule.routes.js";
 import pensionClaimRoutes from "./routes/pensionClaim.routes.js";
 import benefitProgramRoutes from "./routes/benefitProgram.routes.js";
 import benefitApplicationRoutes from "./routes/benefitApplication.routes.js";
+import announcementRoutes from "./routes/announcement.routes.js";
+import notificationRoutes from "./routes/notification.routes.js";
 import { notFoundHandler, errorHandler } from "./middleware/error.middleware.js";
 import { getBarangays } from "./controllers/registration.controller.js";
 
@@ -51,6 +53,8 @@ export function createApp() {
   app.use("/api/pension-claims", pensionClaimRoutes);
   app.use("/api/benefits", benefitProgramRoutes);
   app.use("/api/benefit-applications", benefitApplicationRoutes);
+  app.use("/api/announcements", announcementRoutes);
+  app.use("/api/notifications", notificationRoutes);
   // Convenience alias — same handler as GET /api/registration/barangays.
   app.get("/api/barangays", getBarangays);
 

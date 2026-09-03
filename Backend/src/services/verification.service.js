@@ -7,8 +7,9 @@ import Guardian from "../models/Guardian.js";
 import Document from "../models/Document.js";
 import User from "../models/User.js";
 import Barangay from "../models/Barangay.js";
-import { ACCOUNT_STATUS, VERIFICATION_STATUS, ROLES } from "../utils/constants.js";
+import { ACCOUNT_STATUS, VERIFICATION_STATUS, ROLES, NOTIFICATION_TYPE } from "../utils/constants.js";
 import { NotFoundError, AuthorizationError, ConflictError } from "../utils/errors.js";
+import { createNotification } from "./notification.service.js";
 
 /**
  * Returns pending verifications, scoped to the requesting staff member's
@@ -171,8 +172,8 @@ function assertBarangayScope(verification, requestingUser) {
 
 export async function approveVerification(verificationId, requestingUser, { remarks } = {}) {
   const session = await mongoose.startSession();
+  let result;
   try {
-    let result;
     await session.withTransaction(async () => {
       const verification = await Verification.findById(verificationId).session(session);
       if (!verification) throw new NotFoundError("Verification record not found.");
@@ -200,16 +201,44 @@ export async function approveVerification(verificationId, requestingUser, { rema
 
       result = verification;
     });
-    return result;
   } finally {
     await session.endSession();
   }
+
+  // Notification creation happens only after the transaction has
+  // resolved AND the session has ended — never inside withTransaction,
+  // never passed the session. Mirrors the discipline documented in
+  // benefitApplication.service.js for avoiding "Use of expired
+  // sessions is not permitted": notifying the Senior isn't part of
+  // what must be atomic with the approval itself, so it must not be
+  // coupled to a session that may already be ending.
+  await notifyVerificationOutcome(result, {
+    eventType: "VERIFICATION_APPROVED",
+    title: "Registration Verified",
+    message: "Your SENIORCARE registration has been verified and approved. Your account is now active.",
+  });
+
+  return result;
+}
+
+async function notifyVerificationOutcome(verification, { eventType, title, message }) {
+  const senior = await Senior.findById(verification.seniorId).select("userId");
+  if (!senior) return;
+  await createNotification({
+    recipientId: senior.userId,
+    type: NOTIFICATION_TYPE.DOCUMENT,
+    eventType,
+    title,
+    message,
+    relatedEntityType: "Verification",
+    relatedEntityId: verification._id,
+  });
 }
 
 export async function rejectVerification(verificationId, requestingUser, { reason }) {
   const session = await mongoose.startSession();
+  let result;
   try {
-    let result;
     await session.withTransaction(async () => {
       const verification = await Verification.findById(verificationId).session(session);
       if (!verification) throw new NotFoundError("Verification record not found.");
@@ -237,8 +266,15 @@ export async function rejectVerification(verificationId, requestingUser, { reaso
 
       result = verification;
     });
-    return result;
   } finally {
     await session.endSession();
   }
+
+  await notifyVerificationOutcome(result, {
+    eventType: "VERIFICATION_REJECTED",
+    title: "Registration Rejected",
+    message: `Your SENIORCARE registration was rejected. Reason: ${reason}`,
+  });
+
+  return result;
 }

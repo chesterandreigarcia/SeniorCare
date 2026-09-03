@@ -4,11 +4,12 @@ import BenefitProgram from "../models/BenefitProgram.js";
 import Document from "../models/Document.js";
 import Senior from "../models/Senior.js";
 import User from "../models/User.js";
-import { APPLICATION_STATUS, ACCOUNT_STATUS, DOCUMENT_TYPES, ROLES } from "../utils/constants.js";
+import { APPLICATION_STATUS, ACCOUNT_STATUS, DOCUMENT_TYPES, ROLES, NOTIFICATION_TYPE } from "../utils/constants.js";
 import { NotFoundError, ConflictError, ValidationError, AuthorizationError } from "../utils/errors.js";
 import { assertCanAccessBarangay, hasBroadBarangayAccess } from "../utils/barangayScope.js";
 import { resolveActingSenior } from "../utils/guardianAccess.js";
 import { computeEligibility } from "./benefitProgram.service.js";
+import { createNotification } from "./notification.service.js";
 
 const SENIOR_SUMMARY_FIELDS = "firstName lastName seniorCitizenId barangayId";
 
@@ -186,6 +187,27 @@ export async function listApplications(requestingUser, { status, benefitProgramI
     .sort({ createdAt: -1 });
 }
 
+/**
+ * Notifies the Senior who applied — resolved via the application's own
+ * seniorId, never trusted from anywhere else. Called only after
+ * `application.save()` has already committed (none of these status
+ * transitions run inside a transaction), so there is no session-safety
+ * concern here.
+ */
+async function notifyApplicant(application, { eventType, title, message }) {
+  const senior = await Senior.findById(application.seniorId).select("userId");
+  if (!senior) return;
+  await createNotification({
+    recipientId: senior.userId,
+    type: NOTIFICATION_TYPE.BENEFIT,
+    eventType,
+    title,
+    message,
+    relatedEntityType: "BenefitApplication",
+    relatedEntityId: application._id,
+  });
+}
+
 async function loadApplicationForAction(applicationId, requestingUser) {
   const application = await BenefitApplication.findById(applicationId);
   if (!application) throw new NotFoundError("Benefit application not found.");
@@ -211,6 +233,11 @@ export async function startReview(applicationId, requestingUser) {
   }
   pushHistory(application, { toStatus: APPLICATION_STATUS.UNDER_REVIEW, requestingUser });
   await application.save();
+  await notifyApplicant(application, {
+    eventType: "BENEFIT_APPLICATION_UNDER_REVIEW",
+    title: "Application Under Review",
+    message: "Your benefit application is now under review.",
+  });
   return application;
 }
 
@@ -225,6 +252,11 @@ export async function endorseApplication(applicationId, requestingUser, { remark
   application.remarks = remarks || "";
   pushHistory(application, { toStatus: APPLICATION_STATUS.ENDORSED, requestingUser, remarks });
   await application.save();
+  await notifyApplicant(application, {
+    eventType: "BENEFIT_APPLICATION_ENDORSED",
+    title: "Application Endorsed",
+    message: "Your benefit application has been endorsed for OSCA review.",
+  });
   return application;
 }
 
@@ -249,6 +281,11 @@ export async function rejectApplication(applicationId, requestingUser, { reason 
   application.rejectionReason = reason;
   pushHistory(application, { toStatus: APPLICATION_STATUS.REJECTED, requestingUser, remarks: reason });
   await application.save();
+  await notifyApplicant(application, {
+    eventType: "BENEFIT_APPLICATION_REJECTED",
+    title: "Application Rejected",
+    message: `Your benefit application was rejected. Reason: ${reason}`,
+  });
   return application;
 }
 
@@ -265,6 +302,11 @@ export async function approveApplication(applicationId, requestingUser, { remark
   application.approvedAt = new Date();
   pushHistory(application, { toStatus: APPLICATION_STATUS.APPROVED, requestingUser, remarks });
   await application.save();
+  await notifyApplicant(application, {
+    eventType: "BENEFIT_APPLICATION_APPROVED",
+    title: "Application Approved",
+    message: "Your benefit application has been approved.",
+  });
   return application;
 }
 
@@ -278,6 +320,11 @@ export async function releaseApplication(applicationId, requestingUser, { remark
   application.releasedAt = new Date();
   pushHistory(application, { toStatus: APPLICATION_STATUS.RELEASED, requestingUser, remarks });
   await application.save();
+  await notifyApplicant(application, {
+    eventType: "BENEFIT_APPLICATION_RELEASED",
+    title: "Benefit Released",
+    message: "Your approved benefit has been released. Please coordinate with your Barangay office to claim it.",
+  });
   return application;
 }
 
@@ -290,5 +337,10 @@ export async function completeApplication(applicationId, requestingUser, { remar
   application.completedAt = new Date();
   pushHistory(application, { toStatus: APPLICATION_STATUS.CLAIMED, requestingUser, remarks });
   await application.save();
+  await notifyApplicant(application, {
+    eventType: "BENEFIT_APPLICATION_CLAIMED",
+    title: "Application Completed",
+    message: "Your benefit application has been marked as completed. Thank you.",
+  });
   return application;
 }
