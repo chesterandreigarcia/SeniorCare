@@ -172,5 +172,28 @@ export const NOTIFICATION_TYPE = Object.freeze({
   BENEFIT: "BENEFIT",
   DOCUMENT: "DOCUMENT",
   APPLICATION: "APPLICATION",
+  ACTIVITY: "ACTIVITY",
   SYSTEM: "SYSTEM",
+});
+
+// ---- Social Activities ----
+// A distinct lifecycle from ANNOUNCEMENT_STATUS — an activity is a
+// scheduled, physical event (it can be ONGOING/COMPLETED), not a
+// broadcast notice, so the two statuses are intentionally not shared.
+export const ACTIVITY_STATUS = Object.freeze({
+  DRAFT: "DRAFT",
+  PUBLISHED: "PUBLISHED",
+  ONGOING: "ONGOING",
+  COMPLETED: "COMPLETED",
+  CANCELLED: "CANCELLED",
+});
+
+export const ACTIVITY_CATEGORY = Object.freeze({
+  WELLNESS: "WELLNESS",
+  ASSEMBLY: "ASSEMBLY",
+  HEALTH_SEMINAR: "HEALTH_SEMINAR",
+  EXERCISE: "EXERCISE",
+  COMMUNITY_EVENT: "COMMUNITY_EVENT",
+  LIVELIHOOD: "LIVELIHOOD",
+  GENERAL: "GENERAL",
 });

@@ -30,6 +30,7 @@ import BenefitsPanel from "./BenefitsPanel.jsx";
 import ApplicationsPanel from "./ApplicationsPanel.jsx";
 import AnnouncementsPanel from "./AnnouncementsPanel.jsx";
 import NotificationsPanel from "./NotificationsPanel.jsx";
+import ActivitiesPanel from "./ActivitiesPanel.jsx";
 import NotificationBell from "../../components/NotificationBell.jsx";
 import { getStoredUser, logout, clearSession } from "../../services/authService.js";
 
@@ -46,11 +47,10 @@ import { getStoredUser, logout, clearSession } from "../../services/authService.
  * Senior can never see another Senior's information by tampering with
  * the URL, because there is no id in this URL or request to tamper with.
  *
- * Pension, Benefits & Assistance, Announcements, and Notifications all
- * have real backend modules (see PensionPanel.jsx / BenefitsPanel.jsx /
- * ApplicationsPanel.jsx / AnnouncementsPanel.jsx / NotificationsPanel.jsx).
- * Activities has no backend module yet — that section renders an honest
- * empty state instead of invented data.
+ * Pension, Benefits & Assistance, Announcements, Notifications, and
+ * Activities all have real backend modules (see PensionPanel.jsx /
+ * BenefitsPanel.jsx / ApplicationsPanel.jsx / AnnouncementsPanel.jsx /
+ * NotificationsPanel.jsx / ActivitiesPanel.jsx).
  */
 
 const COLORS = {
@@ -569,12 +569,7 @@ export default function SeniorDashboard() {
 
             {/* ---------- Activities ---------- */}
             <Section id="activities" icon={Users} title="Activities" t={t}>
-              <EmptyState
-                icon={Users}
-                title="No upcoming activities yet."
-                message="Senior citizen assemblies, wellness activities, and community events will appear here."
-                t={t}
-              />
+              <ActivitiesPanel t={t} />
             </Section>
 
             {/* ---------- Notifications ---------- */}
