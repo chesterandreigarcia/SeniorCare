@@ -23,6 +23,7 @@ import {
   AlertCircle,
   Loader2,
   RefreshCw,
+  MessageSquareWarning,
 } from "lucide-react";
 import { getMyProfile } from "../../services/seniorService.js";
 import PensionPanel from "./PensionPanel.jsx";
@@ -31,6 +32,7 @@ import ApplicationsPanel from "./ApplicationsPanel.jsx";
 import AnnouncementsPanel from "./AnnouncementsPanel.jsx";
 import NotificationsPanel from "./NotificationsPanel.jsx";
 import ActivitiesPanel from "./ActivitiesPanel.jsx";
+import ConcernsPanel from "./ConcernsPanel.jsx";
 import NotificationBell from "../../components/NotificationBell.jsx";
 import { getStoredUser, logout, clearSession } from "../../services/authService.js";
 
@@ -68,6 +70,7 @@ const NAV_ITEMS = [
   { id: "applications", label: "My Applications" },
   { id: "announcements", label: "Announcements" },
   { id: "activities", label: "Activities" },
+  { id: "concerns", label: "Report a Concern" },
   { id: "profile", label: "Profile" },
   { id: "help", label: "Help" },
 ];
@@ -570,6 +573,11 @@ export default function SeniorDashboard() {
             {/* ---------- Activities ---------- */}
             <Section id="activities" icon={Users} title="Activities" t={t}>
               <ActivitiesPanel t={t} />
+            </Section>
+
+            {/* ---------- Report a Concern ---------- */}
+            <Section id="concerns" icon={MessageSquareWarning} title="Report a Concern" t={t}>
+              <ConcernsPanel t={t} />
             </Section>
 
             {/* ---------- Notifications ---------- */}

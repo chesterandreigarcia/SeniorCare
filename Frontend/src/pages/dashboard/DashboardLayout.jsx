@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Heart, ClipboardCheck, LogOut, Menu, X, ShieldCheck, Building2, Users2, Wallet, HandHeart, Megaphone, Users } from "lucide-react";
+import { Heart, ClipboardCheck, LogOut, Menu, X, ShieldCheck, Building2, Users2, Wallet, HandHeart, Megaphone, Users, MessageSquareWarning } from "lucide-react";
 import { logout as apiLogout, clearSession, getStoredUser } from "../../services/authService.js";
 import NotificationBell from "../../components/NotificationBell.jsx";
 import { COLORS, FONT_STACK } from "./theme.js";
@@ -58,6 +58,12 @@ export default function DashboardLayout({ children, title, subtitle }) {
       icon: Users,
       label: "Social Activities",
       active: location.pathname.startsWith("/activities-management"),
+    },
+    {
+      to: "/concerns-management",
+      icon: MessageSquareWarning,
+      label: "Reports / Concerns",
+      active: location.pathname.startsWith("/concerns-management"),
     },
     ...(isAdmin
       ? [

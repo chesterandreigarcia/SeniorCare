@@ -10,6 +10,7 @@ import PensionManagementPage from "./pages/dashboard/PensionManagementPage.jsx";
 import BenefitsManagementPage from "./pages/dashboard/BenefitsManagementPage.jsx";
 import AnnouncementsManagementPage from "./pages/dashboard/AnnouncementsManagementPage.jsx";
 import ActivitiesManagementPage from "./pages/dashboard/ActivitiesManagementPage.jsx";
+import ConcernsManagementPage from "./pages/dashboard/ConcernsManagementPage.jsx";
 import SeniorDashboard from "./pages/senior/SeniorDashboard.jsx";
 import ProtectedRoute from "./routes/ProtectedRoute.jsx";
 // import Dashboard from "./pages/Dashboard";
@@ -110,6 +111,16 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={VERIFICATION_ROLES}>
               <ActivitiesManagementPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Barangay/Admin/LGU-OSCA Reports/Concerns management — same role set as verification. */}
+        <Route
+          path="/concerns-management"
+          element={
+            <ProtectedRoute allowedRoles={VERIFICATION_ROLES}>
+              <ConcernsManagementPage />
             </ProtectedRoute>
           }
         />

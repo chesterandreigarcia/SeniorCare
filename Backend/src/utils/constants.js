@@ -173,7 +173,48 @@ export const NOTIFICATION_TYPE = Object.freeze({
   DOCUMENT: "DOCUMENT",
   APPLICATION: "APPLICATION",
   ACTIVITY: "ACTIVITY",
+  CONCERN: "CONCERN",
   SYSTEM: "SYSTEM",
+});
+
+// ---- Reports / Concerns ----
+
+// Strictly sequential — see CONCERN_TRANSITIONS in concern.service.js.
+// A concern cannot jump straight from NEW to RESOLVED.
+export const CONCERN_STATUS = Object.freeze({
+  NEW: "NEW",
+  UNDER_REVIEW: "UNDER_REVIEW",
+  IN_PROGRESS: "IN_PROGRESS",
+  RESOLVED: "RESOLVED",
+});
+
+// The Staff-assigned, official classification — never set directly by
+// the Senior. See CONCERN_URGENCY below for the Senior's own signal.
+export const CONCERN_PRIORITY = Object.freeze({
+  HIGH: "HIGH",
+  MEDIUM: "MEDIUM",
+  REGULAR: "REGULAR",
+});
+
+// What the Senior optionally reports at submission time — informational
+// only, shown to Staff as context. Staff's own `priority` classification
+// (above) is the one that actually drives handling, so the two are
+// intentionally separate fields rather than one Senior-writable field.
+export const CONCERN_URGENCY = Object.freeze({
+  HIGH: "HIGH",
+  MEDIUM: "MEDIUM",
+  REGULAR: "REGULAR",
+});
+
+export const CONCERN_CATEGORY = Object.freeze({
+  PENSION: "PENSION",
+  BENEFITS: "BENEFITS",
+  DOCUMENTS: "DOCUMENTS",
+  REGISTRATION: "REGISTRATION",
+  BARANGAY_SERVICES: "BARANGAY_SERVICES",
+  ACTIVITIES: "ACTIVITIES",
+  ACCOUNT_TECHNICAL: "ACCOUNT_TECHNICAL",
+  OTHER: "OTHER",
 });
 
 // ---- Social Activities ----
