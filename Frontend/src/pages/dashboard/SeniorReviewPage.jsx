@@ -13,6 +13,7 @@ import {
   UsersRound,
   ExternalLink,
   X,
+  KeyRound,
 } from "lucide-react";
 import DashboardLayout from "./DashboardLayout.jsx";
 import { COLORS } from "./theme.js";
@@ -21,7 +22,103 @@ import {
   approveVerification,
   rejectVerification,
   fetchDocumentBlobUrl,
+  createGuardianAccount,
 } from "../../services/verificationService.js";
+
+function GuardianAccountAction({ guardian, verificationStatus, onCreated }) {
+  const [showForm, setShowForm] = useState(false);
+  const [email, setEmail] = useState(guardian.email || "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+  const [result, setResult] = useState(null);
+
+  if (guardian.userId) {
+    return (
+      <p className="flex items-center gap-2 text-sm font-semibold mt-2" style={{ color: "#2f7d43" }}>
+        <CheckCircle2 className="w-4 h-4" aria-hidden="true" />
+        This Guardian already has a login account.
+      </p>
+    );
+  }
+
+  if (verificationStatus !== "APPROVED") {
+    return (
+      <p className="text-sm text-slate-500 mt-2">
+        A Guardian login can be created once this registration is approved — approving confirms the Guardian's
+        submitted authorization documents.
+      </p>
+    );
+  }
+
+  const handleCreate = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const created = await createGuardianAccount(guardian._id, { email });
+      setResult(created);
+      onCreated?.();
+    } catch (err) {
+      setError(err.message || "Unable to create the Guardian's login. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (result) {
+    return (
+      <div className="mt-3 rounded-lg border-2 p-3 text-sm" style={{ borderColor: "#2f7d43", backgroundColor: "#2f7d4310" }}>
+        <p className="font-bold" style={{ color: "#2f7d43" }}>Guardian login created.</p>
+        <p className="mt-1" style={{ color: COLORS.yale }}>
+          Email: <strong>{result.user?.email}</strong>
+        </p>
+        {result.temporaryPassword && (
+          <p style={{ color: COLORS.yale }}>
+            Temporary password: <strong>{result.temporaryPassword}</strong>
+          </p>
+        )}
+        <p className="text-slate-600 mt-1">Share these credentials with the Guardian directly and securely.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3">
+      {!showForm ? (
+        <button
+          type="button"
+          onClick={() => setShowForm(true)}
+          className="flex items-center gap-2 px-3 py-2 rounded-md font-bold text-sm text-white"
+          style={{ backgroundColor: COLORS.baltic }}
+        >
+          <KeyRound className="w-4 h-4" aria-hidden="true" />
+          Create Guardian Login
+        </button>
+      ) : (
+        <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Guardian's email"
+            className="px-3 py-2 rounded-md border-2 text-sm"
+            style={{ borderColor: COLORS.alabaster }}
+          />
+          <button
+            type="button"
+            disabled={saving || !email.trim()}
+            onClick={handleCreate}
+            className="px-3 py-2 rounded-md font-bold text-sm text-white disabled:opacity-50 flex items-center gap-2"
+            style={{ backgroundColor: COLORS.baltic }}
+          >
+            {saving && <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />}
+            Create Login
+          </button>
+        </div>
+      )}
+      {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
+    </div>
+  );
+}
 
 const DOCUMENT_LABELS = {
   VALID_ID: "Valid Identification",
@@ -358,6 +455,7 @@ export default function SeniorReviewPage() {
               <Field label="Address" value={guardian.address} />
               <Field label="ID Type" value={guardian.idType} />
               <Field label="ID Number" value={guardian.idNumber} />
+              <GuardianAccountAction guardian={guardian} verificationStatus={detail?.status} onCreated={load} />
             </Section>
           )}
 

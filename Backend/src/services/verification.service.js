@@ -20,9 +20,20 @@ import { createNotification } from "./notification.service.js";
  * implementation (full result array) so existing callers aren't affected.
  */
 export async function listPendingVerifications(requestingUser, options = null) {
-  const { search = "", page, limit, barangayId } = options || {};
+  const { search = "", page, limit, barangayId, status } = options || {};
 
-  const query = { status: VERIFICATION_STATUS.PENDING };
+  // Defaults to PENDING — every existing caller that doesn't pass
+  // `status` (including calling this with no `options` at all) behaves
+  // exactly as before. `status: "ALL"` removes the status filter
+  // entirely so Staff can find an already-approved Senior again (e.g.
+  // to reach the "Create Guardian Login" action on their review page,
+  // which only appears once the registration is approved).
+  const query = {};
+  if (!status || status === VERIFICATION_STATUS.PENDING) {
+    query.status = VERIFICATION_STATUS.PENDING;
+  } else if (status !== "ALL") {
+    query.status = status;
+  }
 
   const hasBroadAccess = [ROLES.ADMIN, ROLES.LGU_OSCA].includes(requestingUser.role);
   if (!hasBroadAccess) {
@@ -198,6 +209,24 @@ export async function approveVerification(verificationId, requestingUser, { rema
         { status: ACCOUNT_STATUS.ACTIVE },
         { session }
       );
+
+      // Approving a Senior's registration also confirms the authorization
+      // documents for their Guardian/Authorized Representative, if one was
+      // submitted — this is the ONE place that was ever supposed to flip
+      // Guardian.authorizationConfirmed to true, and until this fix nothing
+      // in the codebase ever did. Without it, a Guardian login could never
+      // actually be provisioned (see admin.service.js's createGuardianAccount,
+      // which requires authorizationConfirmed) no matter what the Staff/Admin
+      // UI appeared to do. This does not create or touch any User account —
+      // it only marks the Guardian record itself as confirmed; a distinct
+      // GUARDIAN-role login is still provisioned separately (see below).
+      if (senior.guardianId) {
+        await Guardian.findByIdAndUpdate(
+          senior.guardianId,
+          { authorizationConfirmed: true },
+          { session }
+        );
+      }
 
       result = verification;
     });

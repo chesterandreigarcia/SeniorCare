@@ -13,12 +13,13 @@ export async function createGuardianAccount(req, res, next) {
 
 export async function listPending(req, res, next) {
   try {
-    const { search, page, limit, barangayId } = req.query;
+    const { search, page, limit, barangayId, status } = req.query;
     const result = await verificationService.listPendingVerifications(req.user, {
       search,
       page,
       limit,
       barangayId,
+      status,
     });
     // result.data / result.total etc. — see listPendingVerifications pagination shape.
     res.status(200).json({ success: true, data: result.data, meta: { total: result.total, page: result.page, limit: result.limit, totalPages: result.totalPages } });

@@ -10,16 +10,21 @@ import { api, toApiError } from "../utils/api.js";
 
 /**
  * GET /api/verifications/pending
- * Returns pending senior registrations, scoped server-side to the staff
+ * Returns senior registrations, scoped server-side to the staff
  * member's assigned barangay (Administrators/LGU_OSCA see more broadly,
  * optionally narrowed with `barangayId`).
  *
+ * `status` defaults to "PENDING" (unchanged behavior). Pass "APPROVED",
+ * "REJECTED", or "ALL" to find a Senior after their registration has
+ * already been reviewed — e.g. to reach "Create Guardian Login" on
+ * their review page, which only appears once APPROVED.
+ *
  * Returns: { items, meta: { total, page, limit, totalPages } }
  */
-export async function getPendingVerifications({ search = "", page = 1, limit = 10, barangayId = "" } = {}) {
+export async function getPendingVerifications({ search = "", page = 1, limit = 10, barangayId = "", status = "" } = {}) {
   try {
     const res = await api.get("/verifications/pending", {
-      params: { search, page, limit, ...(barangayId ? { barangayId } : {}) },
+      params: { search, page, limit, ...(barangayId ? { barangayId } : {}), ...(status ? { status } : {}) },
     });
     const body = res.data;
     return {
@@ -107,6 +112,26 @@ export async function rejectVerification(verificationId, { reason }) {
   try {
     const res = await api.patch(`/verifications/${verificationId}/reject`, { reason });
     return res.data;
+  } catch (err) {
+    throw toApiError(err);
+  }
+}
+
+/**
+ * POST /api/verifications/guardians/:guardianRecordId/create-account
+ * Provisions a distinct GUARDIAN-role login for an already
+ * authorization-confirmed Guardian record (see admin.service.js's
+ * createGuardianAccount on the backend) — only reachable once the
+ * Senior's own registration has been approved, which is what actually
+ * confirms the Guardian's submitted authorization documents.
+ */
+export async function createGuardianAccount(guardianRecordId, { email, password } = {}) {
+  try {
+    const res = await api.post(`/verifications/guardians/${guardianRecordId}/create-account`, {
+      email,
+      ...(password ? { password } : {}),
+    });
+    return res.data?.data;
   } catch (err) {
     throw toApiError(err);
   }

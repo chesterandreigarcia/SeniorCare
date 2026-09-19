@@ -123,6 +123,7 @@ export default function VerificationDashboard() {
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [barangayFilter, setBarangayFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("PENDING");
   const [page, setPage] = useState(1);
 
   const [loading, setLoading] = useState(true);
@@ -133,7 +134,7 @@ export default function VerificationDashboard() {
     setError(null);
     try {
       const [pendingRes, statsRes] = await Promise.all([
-        getPendingVerifications({ search, page, limit: PAGE_SIZE, barangayId: barangayFilter }),
+        getPendingVerifications({ search, page, limit: PAGE_SIZE, barangayId: barangayFilter, status: statusFilter }),
         getVerificationStats(),
       ]);
       setItems(pendingRes.items);
@@ -144,7 +145,7 @@ export default function VerificationDashboard() {
     } finally {
       setLoading(false);
     }
-  }, [search, page, barangayFilter]);
+  }, [search, page, barangayFilter, statusFilter]);
 
   useEffect(() => {
     load();
@@ -180,6 +181,35 @@ export default function VerificationDashboard() {
         <StatCard icon={UserCheck} label="Active Seniors" value={stats?.active} accent="#2f9e5f" />
         <StatCard icon={UserX} label="Rejected Registrations" value={stats?.rejected} accent="#b8452f" />
         <StatCard icon={Users} label="Total Seniors" value={stats?.total} accent={COLORS.yale} />
+      </div>
+
+      {/* Status filter — defaults to Pending. Approved/Rejected/All let
+          Staff find a Senior again after review, e.g. to reach "Create
+          Guardian Login" on their page, which only appears once Approved. */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        {[
+          { value: "PENDING", label: "Pending" },
+          { value: "APPROVED", label: "Approved" },
+          { value: "REJECTED", label: "Rejected" },
+          { value: "ALL", label: "All" },
+        ].map((tab) => (
+          <button
+            key={tab.value}
+            type="button"
+            onClick={() => {
+              setPage(1);
+              setStatusFilter(tab.value);
+            }}
+            className="px-4 py-2 rounded-full text-sm font-bold border"
+            style={{
+              borderColor: statusFilter === tab.value ? COLORS.baltic : COLORS.alabaster,
+              backgroundColor: statusFilter === tab.value ? COLORS.baltic : "#ffffff",
+              color: statusFilter === tab.value ? "#ffffff" : COLORS.yale,
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {/* Search + filter */}
@@ -245,10 +275,18 @@ export default function VerificationDashboard() {
           <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
             <ClipboardCheck className="w-8 h-8 mb-3" style={{ color: COLORS.cerulean }} aria-hidden="true" />
             <p className="text-[15px] font-semibold mb-1" style={{ color: COLORS.yale }}>
-              No pending registrations
+              {statusFilter === "PENDING"
+                ? "No pending registrations"
+                : statusFilter === "APPROVED"
+                ? "No approved registrations yet"
+                : statusFilter === "REJECTED"
+                ? "No rejected registrations"
+                : "No registrations found"}
             </p>
             <p className="text-sm text-slate-500 max-w-sm">
-              All submitted senior citizen registrations have been reviewed.
+              {statusFilter === "PENDING"
+                ? "All submitted senior citizen registrations have been reviewed."
+                : "Try a different status filter or search term."}
             </p>
           </div>
         ) : (
