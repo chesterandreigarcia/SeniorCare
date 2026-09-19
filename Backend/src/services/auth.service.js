@@ -8,6 +8,7 @@ import {
 } from "../utils/password.js";
 import { signAccessToken, signRefreshToken } from "../utils/token.js";
 import { ACCOUNT_STATUS, ROLES } from "../utils/constants.js";
+import { listAuthorizedSeniorsForGuardian } from "../utils/guardianAccess.js";
 import {
   AuthenticationError,
   AccountStatusError,
@@ -107,6 +108,17 @@ export async function login({ emailOrUsername, password }) {
     responseUser.barangayId = user.assignedBarangayId.toString();
   }
 
+  // Guardians may manage more than one Senior (see
+  // utils/guardianAccess.js) — the frontend uses this list to decide
+  // whether to auto-select a single managed Senior or show a switcher.
+  // This is purely a UX convenience: every actual request still re-runs
+  // the same authorization check server-side, so this list is never
+  // itself trusted as a grant of access.
+  if (user.role === ROLES.GUARDIAN) {
+    const seniors = await listAuthorizedSeniorsForGuardian({ id: user._id.toString(), role: user.role });
+    responseUser.managedSeniorIds = seniors.map((s) => s._id.toString());
+  }
+
   return {
     accessToken,
     refreshToken,
@@ -142,6 +154,11 @@ export async function getAuthenticatedUser(userId) {
     if (senior) {
       result.seniorId = senior._id.toString();
     }
+  }
+
+  if (user.role === ROLES.GUARDIAN) {
+    const seniors = await listAuthorizedSeniorsForGuardian({ id: user._id.toString(), role: user.role });
+    result.managedSeniorIds = seniors.map((s) => s._id.toString());
   }
 
   return result;

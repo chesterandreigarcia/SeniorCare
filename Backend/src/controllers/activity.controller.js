@@ -81,7 +81,7 @@ export async function listAttendees(req, res, next) {
 
 export async function listForMe(req, res, next) {
   try {
-    const senior = await resolveActingSenior(req.user);
+    const senior = await resolveActingSenior(req.user, req.query.seniorId);
     const { when, category, search } = req.query;
     const activities = await activityService.listActivitiesForSenior(senior, { when, category, search });
     res.status(200).json({ success: true, data: activities });
@@ -92,7 +92,7 @@ export async function listForMe(req, res, next) {
 
 export async function getForMe(req, res, next) {
   try {
-    const senior = await resolveActingSenior(req.user);
+    const senior = await resolveActingSenior(req.user, req.query.seniorId);
     const activity = await activityService.getActivityForSenior(req.params.id, senior);
     res.status(200).json({ success: true, data: activity });
   } catch (err) {
@@ -102,7 +102,7 @@ export async function getForMe(req, res, next) {
 
 export async function confirmMyAttendance(req, res, next) {
   try {
-    const senior = await resolveActingSenior(req.user);
+    const senior = await resolveActingSenior(req.user, req.query.seniorId);
     const attendance = await attendanceService.confirmAttendance(req.params.id, senior, req.user);
     res.status(201).json({ success: true, data: attendance });
   } catch (err) {
@@ -112,7 +112,7 @@ export async function confirmMyAttendance(req, res, next) {
 
 export async function withdrawMyAttendance(req, res, next) {
   try {
-    const senior = await resolveActingSenior(req.user);
+    const senior = await resolveActingSenior(req.user, req.query.seniorId);
     const result = await attendanceService.withdrawAttendance(req.params.id, senior);
     res.status(200).json({ success: true, data: result });
   } catch (err) {

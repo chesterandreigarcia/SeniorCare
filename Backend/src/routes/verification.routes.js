@@ -4,6 +4,7 @@ import { authenticate } from "../middleware/auth.middleware.js";
 import { authorizeRoles } from "../middleware/role.middleware.js";
 import { validateBody } from "../middleware/validation.middleware.js";
 import { approveVerificationSchema, rejectVerificationSchema } from "../validators/verification.validator.js";
+import { createGuardianAccountSchema } from "../validators/guardian.validator.js";
 import { ROLES } from "../utils/constants.js";
 
 const router = Router();
@@ -27,6 +28,19 @@ router.patch(
   staffOrAbove,
   validateBody(rejectVerificationSchema),
   verificationController.reject
+);
+
+// Provisions a login for an already-authorization-confirmed Guardian
+// record. Lives here (not admin.routes.js, which is intentionally
+// ADMIN-only) because enabling a Guardian's login is a natural next
+// step of the same Staff-performed verification workflow that confirmed
+// their authorization documents in the first place.
+router.post(
+  "/guardians/:guardianRecordId/create-account",
+  authenticate,
+  staffOrAbove,
+  validateBody(createGuardianAccountSchema),
+  verificationController.createGuardianAccount
 );
 
 export default router;

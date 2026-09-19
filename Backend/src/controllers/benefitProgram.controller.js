@@ -14,7 +14,7 @@ export async function listPrograms(req, res, next) {
 /** Senior/Guardian view: active programs scoped to their own barangay, with eligibility attached. */
 export async function listMyEligiblePrograms(req, res, next) {
   try {
-    const senior = await resolveActingSenior(req.user);
+    const senior = await resolveActingSenior(req.user, req.query.seniorId);
     const results = await programService.listEligiblePrograms(senior);
     res.status(200).json({ success: true, data: results });
   } catch (err) {

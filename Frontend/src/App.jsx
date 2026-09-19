@@ -12,6 +12,12 @@ import AnnouncementsManagementPage from "./pages/dashboard/AnnouncementsManageme
 import ActivitiesManagementPage from "./pages/dashboard/ActivitiesManagementPage.jsx";
 import ConcernsManagementPage from "./pages/dashboard/ConcernsManagementPage.jsx";
 import SeniorDashboard from "./pages/senior/SeniorDashboard.jsx";
+import GuardianDashboard from "./pages/guardian/GuardianDashboard.jsx";
+import GuardianSeniorsPage from "./pages/guardian/GuardianSeniorsPage.jsx";
+import GuardianPensionPage from "./pages/guardian/GuardianPensionPage.jsx";
+import GuardianDocumentsPage from "./pages/guardian/GuardianDocumentsPage.jsx";
+import GuardianConcernsPage from "./pages/guardian/GuardianConcernsPage.jsx";
+import GuardianNotificationsPage from "./pages/guardian/GuardianNotificationsPage.jsx";
 import ProtectedRoute from "./routes/ProtectedRoute.jsx";
 // import Dashboard from "./pages/Dashboard";
 // import Profile from "./pages/Profile";
@@ -35,6 +41,59 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={["SENIOR_CITIZEN"]}>
               <SeniorDashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Guardian / Authorized Representative dashboard — acts on behalf
+            of Senior(s) it is explicitly authorized for. Every page
+            re-verifies that authorization server-side; the selected-Senior
+            context kept client-side (guardianService.js) is UX only. */}
+        <Route
+          path="/guardian/dashboard"
+          element={
+            <ProtectedRoute allowedRoles={["GUARDIAN"]}>
+              <GuardianDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/guardian/seniors"
+          element={
+            <ProtectedRoute allowedRoles={["GUARDIAN"]}>
+              <GuardianSeniorsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/guardian/pension"
+          element={
+            <ProtectedRoute allowedRoles={["GUARDIAN"]}>
+              <GuardianPensionPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/guardian/documents"
+          element={
+            <ProtectedRoute allowedRoles={["GUARDIAN"]}>
+              <GuardianDocumentsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/guardian/concerns"
+          element={
+            <ProtectedRoute allowedRoles={["GUARDIAN"]}>
+              <GuardianConcernsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/guardian/notifications"
+          element={
+            <ProtectedRoute allowedRoles={["GUARDIAN"]}>
+              <GuardianNotificationsPage />
             </ProtectedRoute>
           }
         />

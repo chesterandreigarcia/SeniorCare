@@ -9,7 +9,8 @@ export async function applyForBenefit(req, res, next) {
       req.user,
       req.validatedBody,
       files,
-      req.validatedBody.documentTypes
+      req.validatedBody.documentTypes,
+      req.query.seniorId
     );
     res.status(201).json({ success: true, data: application });
   } catch (err) {
@@ -19,7 +20,7 @@ export async function applyForBenefit(req, res, next) {
 
 export async function listMyApplications(req, res, next) {
   try {
-    const applications = await applicationService.listMyApplications(req.user);
+    const applications = await applicationService.listMyApplications(req.user, req.query.seniorId);
     res.status(200).json({ success: true, data: applications });
   } catch (err) {
     next(err);
@@ -28,7 +29,7 @@ export async function listMyApplications(req, res, next) {
 
 export async function getMyApplication(req, res, next) {
   try {
-    const application = await applicationService.getMyApplicationById(req.params.id, req.user);
+    const application = await applicationService.getMyApplicationById(req.params.id, req.user, req.query.seniorId);
     res.status(200).json({ success: true, data: application });
   } catch (err) {
     next(err);

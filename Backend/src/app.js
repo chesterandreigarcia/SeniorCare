@@ -19,6 +19,7 @@ import announcementRoutes from "./routes/announcement.routes.js";
 import notificationRoutes from "./routes/notification.routes.js";
 import activityRoutes from "./routes/activity.routes.js";
 import concernRoutes from "./routes/concern.routes.js";
+import guardianRoutes from "./routes/guardian.routes.js";
 import { notFoundHandler, errorHandler } from "./middleware/error.middleware.js";
 import { getBarangays } from "./controllers/registration.controller.js";
 
@@ -59,6 +60,7 @@ export function createApp() {
   app.use("/api/notifications", notificationRoutes);
   app.use("/api/activities", activityRoutes);
   app.use("/api/concerns", concernRoutes);
+  app.use("/api/guardian", guardianRoutes);
   // Convenience alias — same handler as GET /api/registration/barangays.
   app.get("/api/barangays", getBarangays);
 

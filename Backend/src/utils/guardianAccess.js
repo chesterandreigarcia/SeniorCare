@@ -18,25 +18,15 @@ import { AuthorizationError, NotFoundError } from "./errors.js";
  * used throughout the app (`Senior.findOne({ userId: req.user.id })`):
  * a Senior can only ever resolve to their own profile.
  *
- * ── Dormant (prepared, not reachable) behavior ─────────────────────
- * For `GUARDIAN`, the rule is already fully implemented below, but it
- * is NOT wired into anything a Guardian could reach today:
- *
- *   - No registration/admin flow anywhere in the codebase ever creates
- *     a User with role GUARDIAN (verified by inspecting
- *     registration.service.js and admin.service.js) — so no account
- *     that could hit this branch can currently be logged into.
- *   - There is no Guardian login page, dashboard, or protected route
- *     in the frontend (`App.jsx`) that would call an endpoint using
- *     this helper as a GUARDIAN.
- *
- * In other words: including ROLES.GUARDIAN in a route's
- * `authorizeRoles(...)` list today does not open anything up, because
- * nothing can currently authenticate as GUARDIAN. This lets a module
- * like Benefits & Assistance be "Guardian-ready" now, and activated
- * later purely by building Guardian registration/login/dashboard —
- * with ZERO changes required to this file or to the modules that call
- * it.
+ * ── Dormant (prepared, not reachable) behavior — UPDATED ───────────
+ * For `GUARDIAN`, the rule below is now reachable: Barangay Staff/Admin
+ * can create a GUARDIAN-role login for an already-authorization-confirmed
+ * Guardian record (see admin.service.js's createGuardianAccount, mirroring
+ * createStaffAccount), and the Guardian dashboard (routes/guardian.routes.js)
+ * lets that account log in and act for its authorized Senior(s). Every
+ * module that already accepted SENIOR_OR_GUARDIAN_ROLES before this change
+ * required no further changes — this file is still the single place the
+ * rule itself lives.
  *
  * The rule itself, once reachable, is intentionally strict and
  * bidirectional — both sides of the relationship must agree:
@@ -54,11 +44,19 @@ import { AuthorizationError, NotFoundError } from "./errors.js";
  *      Senior side cannot be used to gain access.
  *
  * A Guardian can never widen this by supplying a different seniorId —
- * there is no seniorId parameter here at all; the Senior is always
- * derived server-side from the authenticated Guardian's own linked
- * record.
+ * for SENIOR_CITIZEN there is no seniorId parameter at all; the Senior
+ * is always derived server-side from the authenticated user's own
+ * linked record. For GUARDIAN, an optional `requestedSeniorId` is
+ * accepted ONLY to disambiguate which of the Guardian's OWN authorized
+ * Seniors a request is for (Part 3/16 of the Guardian module — a
+ * Guardian may manage more than one Senior). It is never treated as a
+ * bare permission grant: the same three-way check above (Guardian doc
+ * exists, is confirmed, and the Senior points back at it) still runs
+ * against that specific id, so requesting an id that isn't actually one
+ * of this Guardian's own authorized Seniors fails exactly the same way
+ * as if no id had narrowed anything down.
  */
-export async function resolveActingSenior(requestingUser) {
+export async function resolveActingSenior(requestingUser, requestedSeniorId) {
   if (requestingUser.role === ROLES.SENIOR_CITIZEN) {
     const senior = await Senior.findOne({ userId: requestingUser.id });
     if (!senior) throw new NotFoundError("Senior profile not found.");
@@ -69,10 +67,18 @@ export async function resolveActingSenior(requestingUser) {
     // Dormant: unreachable until a GUARDIAN-role account can be created
     // and logged in (see the module doc comment above). Implemented now
     // so activating Guardian access later needs no changes here.
-    const guardian = await Guardian.findOne({
-      userId: requestingUser.id,
-      authorizationConfirmed: true,
-    });
+    const guardianQuery = { userId: requestingUser.id, authorizationConfirmed: true };
+    if (requestedSeniorId) guardianQuery.seniorId = requestedSeniorId;
+
+    // A real-world Guardian may have more than one Guardian record (one
+    // per Senior they're authorized for, each created during that
+    // Senior's own registration/verification — see models/Guardian.js).
+    // Without a requestedSeniorId, we fall back to the first authorized
+    // record for backward compatibility with every call site that
+    // predates multi-Senior support; callers that need to let the
+    // Guardian choose should pass the id explicitly (see
+    // listAuthorizedSeniorsForGuardian below for the selection list).
+    const guardian = await Guardian.findOne(guardianQuery);
     if (!guardian) {
       throw new AuthorizationError("You are not authorized to act on behalf of a Senior Citizen.");
     }
@@ -86,6 +92,36 @@ export async function resolveActingSenior(requestingUser) {
   }
 
   throw new AuthorizationError("Only a Senior Citizen (or their authorized Guardian) may perform this action.");
+}
+
+/**
+ * Every Senior a Guardian is currently authorized to act for — the
+ * backing list for "My Managed Seniors" and for the seniorId selector
+ * used elsewhere in this file. Same bidirectional check as
+ * resolveActingSenior (Guardian doc confirmed AND Senior points back at
+ * it), just applied across all of this Guardian's records instead of one.
+ */
+export async function listAuthorizedSeniorsForGuardian(requestingUser) {
+  if (requestingUser.role !== ROLES.GUARDIAN) return [];
+
+  const guardianRecords = await Guardian.find({
+    userId: requestingUser.id,
+    authorizationConfirmed: true,
+  });
+  if (guardianRecords.length === 0) return [];
+
+  const bySeniorId = new Map(guardianRecords.map((g) => [g.seniorId.toString(), g]));
+  const seniors = await Senior.find({ _id: { $in: [...bySeniorId.keys()] } }).populate(
+    "barangayId",
+    "name municipality"
+  );
+
+  // Keep only Seniors that actually point back at the same Guardian
+  // record — the same bidirectional guard as resolveActingSenior.
+  return seniors.filter((s) => {
+    const guardian = bySeniorId.get(s._id.toString());
+    return guardian && s.guardianId && s.guardianId.toString() === guardian._id.toString();
+  });
 }
 
 /**

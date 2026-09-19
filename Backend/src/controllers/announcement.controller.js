@@ -19,7 +19,7 @@ export async function listForStaff(req, res, next) {
 /** Senior/Guardian: published announcements applicable to them. */
 export async function listForMe(req, res, next) {
   try {
-    const senior = await resolveActingSenior(req.user);
+    const senior = await resolveActingSenior(req.user, req.query.seniorId);
     const { category, search } = req.query;
     const announcements = await announcementService.listAnnouncementsForSenior(senior, { category, search });
     res.status(200).json({ success: true, data: announcements });

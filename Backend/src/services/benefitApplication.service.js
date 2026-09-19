@@ -41,13 +41,20 @@ function pushHistory(application, { toStatus, requestingUser, remarks }) {
  * Senior/Guardian applies for a benefit program.
  *
  * `requestingUser` is resolved to an acting Senior via
- * `resolveActingSenior` — the caller never supplies a seniorId. For
- * SENIOR_CITIZEN this is exactly today's behavior; the GUARDIAN branch
- * inside that helper is present but unreachable until Guardian login
- * exists (see utils/guardianAccess.js).
+ * `resolveActingSenior` — the caller never supplies a bare seniorId as
+ * authorization; an optional one may be passed only to disambiguate
+ * which of a Guardian's own authorized Seniors this is for (see
+ * utils/guardianAccess.js). For SENIOR_CITIZEN this is exactly today's
+ * behavior — the parameter is ignored for that role.
  */
-export async function applyForBenefit(requestingUser, { benefitProgramId }, uploadedFiles = [], documentTypes = []) {
-  const senior = await resolveActingSenior(requestingUser);
+export async function applyForBenefit(
+  requestingUser,
+  { benefitProgramId },
+  uploadedFiles = [],
+  documentTypes = [],
+  requestedSeniorId
+) {
+  const senior = await resolveActingSenior(requestingUser, requestedSeniorId);
 
   const seniorUser = await User.findById(senior.userId);
   if (!seniorUser || seniorUser.status !== ACCOUNT_STATUS.ACTIVE) {
@@ -141,16 +148,16 @@ export async function applyForBenefit(requestingUser, { benefitProgramId }, uplo
 }
 
 /** The acting Senior/Guardian's own application history. */
-export async function listMyApplications(requestingUser) {
-  const senior = await resolveActingSenior(requestingUser);
+export async function listMyApplications(requestingUser, requestedSeniorId) {
+  const senior = await resolveActingSenior(requestingUser, requestedSeniorId);
   return BenefitApplication.find({ seniorId: senior._id })
     .populate({ path: "benefitProgramId" })
     .sort({ createdAt: -1 });
 }
 
 /** A single application, but only if it belongs to the acting Senior/Guardian. */
-export async function getMyApplicationById(applicationId, requestingUser) {
-  const senior = await resolveActingSenior(requestingUser);
+export async function getMyApplicationById(applicationId, requestingUser, requestedSeniorId) {
+  const senior = await resolveActingSenior(requestingUser, requestedSeniorId);
   const application = await BenefitApplication.findOne({ _id: applicationId, seniorId: senior._id })
     .populate({ path: "benefitProgramId" })
     .populate({ path: "documentIds" });

@@ -5,18 +5,24 @@ import { authorizeRoles } from "../middleware/role.middleware.js";
 import { validateBody } from "../middleware/validation.middleware.js";
 import { bookSlotSchema, verifyClaimSchema } from "../validators/pension.validator.js";
 import { ROLES } from "../utils/constants.js";
+import { SENIOR_OR_GUARDIAN_ROLES } from "../utils/guardianAccess.js";
 
 const router = Router();
 
 const staffOrAbove = authorizeRoles(ROLES.BARANGAY_STAFF, ROLES.ADMIN, ROLES.LGU_OSCA);
-const seniorOnly = authorizeRoles(ROLES.SENIOR_CITIZEN);
+// GUARDIAN included so an authorized Guardian can act for their managed
+// Senior — see the controller, which resolves the actual acting Senior
+// via resolveActingSenior() before ever touching pensionClaim.service.js
+// (which is intentionally left untouched: it still only ever sees the
+// target Senior's own userId, exactly as before).
+const seniorOrGuardian = authorizeRoles(...SENIOR_OR_GUARDIAN_ROLES);
 
 // Senior self-service.
-router.post("/", authenticate, seniorOnly, validateBody(bookSlotSchema), claimController.bookSlot);
-router.get("/me/upcoming", authenticate, seniorOnly, claimController.getMyUpcomingClaim);
-router.get("/me/history", authenticate, seniorOnly, claimController.getMyClaimHistory);
-router.get("/me/:id/qr", authenticate, seniorOnly, claimController.getMyClaimQr);
-router.post("/:id/cancel", authenticate, seniorOnly, claimController.cancelClaim);
+router.post("/", authenticate, seniorOrGuardian, validateBody(bookSlotSchema), claimController.bookSlot);
+router.get("/me/upcoming", authenticate, seniorOrGuardian, claimController.getMyUpcomingClaim);
+router.get("/me/history", authenticate, seniorOrGuardian, claimController.getMyClaimHistory);
+router.get("/me/:id/qr", authenticate, seniorOrGuardian, claimController.getMyClaimQr);
+router.post("/:id/cancel", authenticate, seniorOrGuardian, claimController.cancelClaim);
 
 // Barangay Staff / Admin / LGU-OSCA.
 router.get("/", authenticate, staffOrAbove, claimController.listClaims);

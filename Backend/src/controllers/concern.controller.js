@@ -5,7 +5,7 @@ import { resolveActingSenior } from "../utils/guardianAccess.js";
 
 export async function create(req, res, next) {
   try {
-    const senior = await resolveActingSenior(req.user);
+    const senior = await resolveActingSenior(req.user, req.query.seniorId);
     const concern = await concernService.createConcern(senior, req.user, req.validatedBody);
     res.status(201).json({ success: true, data: concern });
   } catch (err) {
@@ -15,7 +15,7 @@ export async function create(req, res, next) {
 
 export async function listForMe(req, res, next) {
   try {
-    const senior = await resolveActingSenior(req.user);
+    const senior = await resolveActingSenior(req.user, req.query.seniorId);
     const { status, category, search } = req.query;
     const concerns = await concernService.listConcernsForSenior(senior, { status, category, search });
     res.status(200).json({ success: true, data: concerns });
@@ -26,7 +26,7 @@ export async function listForMe(req, res, next) {
 
 export async function getForMe(req, res, next) {
   try {
-    const senior = await resolveActingSenior(req.user);
+    const senior = await resolveActingSenior(req.user, req.query.seniorId);
     const concern = await concernService.getConcernForSenior(req.params.id, senior);
     res.status(200).json({ success: true, data: concern });
   } catch (err) {

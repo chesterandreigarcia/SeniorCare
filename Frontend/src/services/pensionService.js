@@ -7,6 +7,10 @@ import { api, toApiError } from "../utils/api.js";
  * no seniorId anywhere in these calls for a Senior to tamper with.
  */
 
+function withSeniorId(seniorId) {
+  return seniorId ? { params: { seniorId } } : undefined;
+}
+
 export async function getMyPension() {
   try {
     const res = await api.get("/pensions/me");
@@ -26,45 +30,51 @@ export async function getMyBarangaySchedules() {
   }
 }
 
-export async function getMyUpcomingClaim() {
+/**
+ * seniorId is optional and only meaningful for a GUARDIAN account
+ * managing more than one Senior (see guardian.service.js's
+ * resolveActingSenior threading on the backend) — a Senior calling
+ * these normally omits it entirely, unchanged from before.
+ */
+export async function getMyUpcomingClaim(seniorId) {
   try {
-    const res = await api.get("/pension-claims/me/upcoming");
+    const res = await api.get("/pension-claims/me/upcoming", withSeniorId(seniorId));
     return res.data?.data || null;
   } catch (err) {
     throw toApiError(err);
   }
 }
 
-export async function getMyClaimHistory() {
+export async function getMyClaimHistory(seniorId) {
   try {
-    const res = await api.get("/pension-claims/me/history");
+    const res = await api.get("/pension-claims/me/history", withSeniorId(seniorId));
     return res.data?.data || [];
   } catch (err) {
     throw toApiError(err);
   }
 }
 
-export async function getMyClaimQr(claimId) {
+export async function getMyClaimQr(claimId, seniorId) {
   try {
-    const res = await api.get(`/pension-claims/me/${claimId}/qr`);
+    const res = await api.get(`/pension-claims/me/${claimId}/qr`, withSeniorId(seniorId));
     return res.data?.data; // { claim, qrDataUrl }
   } catch (err) {
     throw toApiError(err);
   }
 }
 
-export async function bookClaimingSlot({ scheduleId, slotId }) {
+export async function bookClaimingSlot({ scheduleId, slotId }, seniorId) {
   try {
-    const res = await api.post("/pension-claims", { scheduleId, slotId });
+    const res = await api.post("/pension-claims", { scheduleId, slotId }, withSeniorId(seniorId));
     return res.data?.data;
   } catch (err) {
     throw toApiError(err);
   }
 }
 
-export async function cancelClaimingBooking(claimId) {
+export async function cancelClaimingBooking(claimId, seniorId) {
   try {
-    const res = await api.post(`/pension-claims/${claimId}/cancel`);
+    const res = await api.post(`/pension-claims/${claimId}/cancel`, {}, withSeniorId(seniorId));
     return res.data?.data;
   } catch (err) {
     throw toApiError(err);

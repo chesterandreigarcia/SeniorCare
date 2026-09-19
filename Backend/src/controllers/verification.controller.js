@@ -1,5 +1,15 @@
 import path from "node:path";
 import * as verificationService from "../services/verification.service.js";
+import * as adminService from "../services/admin.service.js";
+
+export async function createGuardianAccount(req, res, next) {
+  try {
+    const result = await adminService.createGuardianAccount(req.user, req.params.guardianRecordId, req.validatedBody);
+    res.status(201).json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+}
 
 export async function listPending(req, res, next) {
   try {

@@ -12,21 +12,22 @@ import { api, toApiError } from "../utils/api.js";
 
 // ---------------- Senior/Guardian-facing ----------------
 
-export async function submitConcern(payload) {
+export async function submitConcern(payload, seniorId) {
   try {
-    const res = await api.post("/concerns", payload);
+    const res = await api.post("/concerns", payload, seniorId ? { params: { seniorId } } : undefined);
     return res.data?.data;
   } catch (err) {
     throw toApiError(err);
   }
 }
 
-export async function getMyConcerns({ status, category, search } = {}) {
+export async function getMyConcerns({ status, category, search, seniorId } = {}) {
   try {
     const params = {};
     if (status) params.status = status;
     if (category) params.category = category;
     if (search) params.search = search;
+    if (seniorId) params.seniorId = seniorId;
     const res = await api.get("/concerns/me", { params });
     return res.data?.data || [];
   } catch (err) {
@@ -34,9 +35,9 @@ export async function getMyConcerns({ status, category, search } = {}) {
   }
 }
 
-export async function getMyConcern(concernId) {
+export async function getMyConcern(concernId, seniorId) {
   try {
-    const res = await api.get(`/concerns/me/${concernId}`);
+    const res = await api.get(`/concerns/me/${concernId}`, seniorId ? { params: { seniorId } } : undefined);
     return res.data?.data;
   } catch (err) {
     throw toApiError(err);

@@ -2,8 +2,10 @@ import crypto from "node:crypto";
 import Barangay from "../models/Barangay.js";
 import User from "../models/User.js";
 import Senior from "../models/Senior.js";
+import Guardian from "../models/Guardian.js";
 import { ROLES, ACCOUNT_STATUS } from "../utils/constants.js";
 import { hashPassword } from "../utils/password.js";
+import { hasBroadBarangayAccess } from "../utils/barangayScope.js";
 import { NotFoundError, ConflictError, ValidationError } from "../utils/errors.js";
 
 /**
@@ -122,6 +124,83 @@ export async function getStaffById(staffId) {
   if (!staff) throw new NotFoundError("Staff account not found.");
   return staff;
 }
+
+// ---------------------------------------------------------------------
+// Guardian accounts
+// ---------------------------------------------------------------------
+
+/**
+ * Provisions a login for an already-authorization-confirmed Guardian
+ * record — mirrors createStaffAccount above almost exactly (temp
+ * password, hashing, uniqueness check), just for a Guardian instead of
+ * a Barangay Staff member. `role` is hardcoded, never accepted from the
+ * client, same as every other account-creation path in this file.
+ *
+ * A Guardian record only becomes eligible once Barangay Staff has
+ * confirmed the authorization documents during the Senior's own
+ * verification (Guardian.authorizationConfirmed) — this function does
+ * not itself grant authorization, it only lets an already-authorized
+ * Guardian actually log in.
+ */
+export async function createGuardianAccount(requestingUser, guardianRecordId, data) {
+  const guardian = await Guardian.findById(guardianRecordId);
+  if (!guardian) throw new NotFoundError("Guardian record not found.");
+  if (!guardian.authorizationConfirmed) {
+    throw new ValidationError("This Guardian's authorization has not been confirmed yet.", {
+      guardianRecordId: "Authorization not yet confirmed.",
+    });
+  }
+  if (guardian.userId) {
+    throw new ConflictError("This Guardian already has a login account.");
+  }
+
+  const senior = await Senior.findById(guardian.seniorId);
+  if (!senior) throw new NotFoundError("Associated Senior profile not found.");
+
+  // Barangay Staff may only provision a Guardian login for a Senior in
+  // their own assigned Barangay — the same scoping rule as every other
+  // Staff-performed action; Admin/LGU-OSCA are unrestricted.
+  if (!hasBroadBarangayAccess(requestingUser.role)) {
+    if (!requestingUser.assignedBarangayId || requestingUser.assignedBarangayId !== senior.barangayId.toString()) {
+      throw new ValidationError("You may only create Guardian accounts for Seniors in your assigned Barangay.", {});
+    }
+  }
+
+  if (!data.email) {
+    throw new ValidationError("An email is required to create a Guardian login.", { email: "Email is required." });
+  }
+  const existing = await User.findOne({ email: data.email });
+  if (existing) {
+    throw new ConflictError("An account with this email already exists.");
+  }
+
+  const temporaryPassword = data.password || generateTemporaryPassword();
+  const passwordHash = await hashPassword(temporaryPassword);
+
+  const user = await User.create({
+    email: data.email,
+    passwordHash,
+    role: ROLES.GUARDIAN,
+    status: ACCOUNT_STATUS.ACTIVE,
+    // Guardians are not Barangay-scoped staff — their access is scoped
+    // entirely through the Guardian-Senior relationship instead (see
+    // utils/guardianAccess.js), so assignedBarangayId stays null here.
+    assignedBarangayId: null,
+  });
+
+  guardian.userId = user._id;
+  await guardian.save();
+
+  return {
+    user,
+    guardian,
+    temporaryPassword: data.password ? undefined : temporaryPassword,
+  };
+}
+
+// ---------------------------------------------------------------------
+// Barangay Staff (continued)
+// ---------------------------------------------------------------------
 
 export async function updateStaffAssignment(staffId, assignedBarangayId) {
   await assertBarangayExistsAndActive(assignedBarangayId);
