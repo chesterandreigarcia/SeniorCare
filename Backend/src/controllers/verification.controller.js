@@ -11,6 +11,15 @@ export async function createGuardianAccount(req, res, next) {
   }
 }
 
+export async function resetGuardianPassword(req, res, next) {
+  try {
+    const result = await adminService.resetGuardianPassword(req.user, req.params.guardianRecordId, req.validatedBody);
+    res.status(200).json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function listPending(req, res, next) {
   try {
     const { search, page, limit, barangayId, status } = req.query;

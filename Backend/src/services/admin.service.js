@@ -198,6 +198,42 @@ export async function createGuardianAccount(requestingUser, guardianRecordId, da
   };
 }
 
+/**
+ * Regenerates the login password for a Guardian who already has an
+ * account — the recovery path for when the one-time temporary password
+ * shown at creation was lost/never captured. Same barangay-scoping rule
+ * as createGuardianAccount; the new password is shown exactly once,
+ * the same way, and is never stored or retrievable afterward.
+ */
+export async function resetGuardianPassword(requestingUser, guardianRecordId, data = {}) {
+  const guardian = await Guardian.findById(guardianRecordId);
+  if (!guardian) throw new NotFoundError("Guardian record not found.");
+  if (!guardian.userId) {
+    throw new ConflictError("This Guardian does not have a login account yet.");
+  }
+
+  const senior = await Senior.findById(guardian.seniorId);
+  if (!senior) throw new NotFoundError("Associated Senior profile not found.");
+
+  if (!hasBroadBarangayAccess(requestingUser.role)) {
+    if (!requestingUser.assignedBarangayId || requestingUser.assignedBarangayId !== senior.barangayId.toString()) {
+      throw new ValidationError("You may only reset Guardian passwords for Seniors in your assigned Barangay.", {});
+    }
+  }
+
+  const temporaryPassword = data.password || generateTemporaryPassword();
+  const passwordHash = await hashPassword(temporaryPassword);
+
+  const user = await User.findByIdAndUpdate(guardian.userId, { passwordHash }, { new: true });
+  if (!user) throw new NotFoundError("This Guardian's login account no longer exists.");
+
+  return {
+    user,
+    guardian,
+    temporaryPassword: data.password ? undefined : temporaryPassword,
+  };
+}
+
 // ---------------------------------------------------------------------
 // Barangay Staff (continued)
 // ---------------------------------------------------------------------

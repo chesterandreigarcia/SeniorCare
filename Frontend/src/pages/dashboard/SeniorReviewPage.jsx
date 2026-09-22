@@ -23,6 +23,7 @@ import {
   rejectVerification,
   fetchDocumentBlobUrl,
   createGuardianAccount,
+  resetGuardianPassword,
 } from "../../services/verificationService.js";
 
 function GuardianAccountAction({ guardian, verificationStatus, onCreated }) {
@@ -31,13 +32,74 @@ function GuardianAccountAction({ guardian, verificationStatus, onCreated }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
+  const [resultAction, setResultAction] = useState(null); // "created" | "reset"
+  const [resetting, setResetting] = useState(false);
+  const [resetError, setResetError] = useState(null);
+
+  // IMPORTANT: this check must come BEFORE the `guardian.userId` check
+  // below. handleCreate() calls onCreated(), which makes the parent page
+  // refetch its data — that refetch brings back a `guardian` prop that
+  // now HAS a userId, which would otherwise make the "already has a
+  // login account" message win and hide the just-generated temporary
+  // password the moment the refresh lands (often before the person even
+  // sees it). Once this component has its own `result` from an action it
+  // just performed, that always takes priority over whatever the parent
+  // re-fetched.
+  if (result) {
+    return (
+      <div className="mt-3 rounded-lg border-2 p-3 text-sm" style={{ borderColor: "#2f7d43", backgroundColor: "#2f7d4310" }}>
+        <p className="font-bold" style={{ color: "#2f7d43" }}>
+          {resultAction === "reset" ? "Guardian password reset." : "Guardian login created."}
+        </p>
+        <p className="mt-1" style={{ color: COLORS.yale }}>
+          Email: <strong>{result.user?.email}</strong>
+        </p>
+        {result.temporaryPassword && (
+          <p style={{ color: COLORS.yale }}>
+            {resultAction === "reset" ? "New temporary password" : "Temporary password"}: <strong>{result.temporaryPassword}</strong>
+          </p>
+        )}
+        <p className="text-slate-600 mt-1">Share these credentials with the Guardian directly and securely. This password will not be shown again.</p>
+      </div>
+    );
+  }
+
+  const handleReset = async () => {
+    setResetting(true);
+    setResetError(null);
+    try {
+      const reset = await resetGuardianPassword(guardian._id);
+      setResult(reset);
+      setResultAction("reset");
+    } catch (err) {
+      setResetError(err.message || "Unable to reset the Guardian's password. Please try again.");
+    } finally {
+      setResetting(false);
+    }
+  };
 
   if (guardian.userId) {
     return (
-      <p className="flex items-center gap-2 text-sm font-semibold mt-2" style={{ color: "#2f7d43" }}>
-        <CheckCircle2 className="w-4 h-4" aria-hidden="true" />
-        This Guardian already has a login account.
-      </p>
+      <div className="mt-2">
+        <p className="flex items-center gap-2 text-sm font-semibold" style={{ color: "#2f7d43" }}>
+          <CheckCircle2 className="w-4 h-4" aria-hidden="true" />
+          This Guardian already has a login account.
+        </p>
+        <button
+          type="button"
+          onClick={handleReset}
+          disabled={resetting}
+          className="mt-2 flex items-center gap-2 px-3 py-2 rounded-md font-bold text-sm border-2 disabled:opacity-50"
+          style={{ borderColor: COLORS.alabaster, color: COLORS.yale }}
+        >
+          {resetting && <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />}
+          Reset Password
+        </button>
+        <p className="text-xs text-slate-500 mt-1">
+          Use this if the original temporary password was lost before it could be shared with the Guardian.
+        </p>
+        {resetError && <p className="text-sm text-red-600 mt-2">{resetError}</p>}
+      </div>
     );
   }
 
@@ -56,6 +118,7 @@ function GuardianAccountAction({ guardian, verificationStatus, onCreated }) {
     try {
       const created = await createGuardianAccount(guardian._id, { email });
       setResult(created);
+      setResultAction("created");
       onCreated?.();
     } catch (err) {
       setError(err.message || "Unable to create the Guardian's login. Please try again.");
@@ -63,23 +126,6 @@ function GuardianAccountAction({ guardian, verificationStatus, onCreated }) {
       setSaving(false);
     }
   };
-
-  if (result) {
-    return (
-      <div className="mt-3 rounded-lg border-2 p-3 text-sm" style={{ borderColor: "#2f7d43", backgroundColor: "#2f7d4310" }}>
-        <p className="font-bold" style={{ color: "#2f7d43" }}>Guardian login created.</p>
-        <p className="mt-1" style={{ color: COLORS.yale }}>
-          Email: <strong>{result.user?.email}</strong>
-        </p>
-        {result.temporaryPassword && (
-          <p style={{ color: COLORS.yale }}>
-            Temporary password: <strong>{result.temporaryPassword}</strong>
-          </p>
-        )}
-        <p className="text-slate-600 mt-1">Share these credentials with the Guardian directly and securely.</p>
-      </div>
-    );
-  }
 
   return (
     <div className="mt-3">

@@ -4,7 +4,7 @@ import { authenticate } from "../middleware/auth.middleware.js";
 import { authorizeRoles } from "../middleware/role.middleware.js";
 import { validateBody } from "../middleware/validation.middleware.js";
 import { approveVerificationSchema, rejectVerificationSchema } from "../validators/verification.validator.js";
-import { createGuardianAccountSchema } from "../validators/guardian.validator.js";
+import { createGuardianAccountSchema, resetGuardianPasswordSchema } from "../validators/guardian.validator.js";
 import { ROLES } from "../utils/constants.js";
 
 const router = Router();
@@ -41,6 +41,18 @@ router.post(
   staffOrAbove,
   validateBody(createGuardianAccountSchema),
   verificationController.createGuardianAccount
+);
+
+// Recovery path for a Guardian whose one-time temporary password was
+// lost/never captured — regenerates and shows a new one exactly the
+// same way. Only valid once an account already exists (see
+// resetGuardianPassword's own check).
+router.post(
+  "/guardians/:guardianRecordId/reset-password",
+  authenticate,
+  staffOrAbove,
+  validateBody(resetGuardianPasswordSchema),
+  verificationController.resetGuardianPassword
 );
 
 export default router;

@@ -136,3 +136,18 @@ export async function createGuardianAccount(guardianRecordId, { email, password 
     throw toApiError(err);
   }
 }
+
+/**
+ * POST /api/verifications/guardians/:guardianRecordId/reset-password
+ * Recovery path when the one-time temporary password from account
+ * creation was lost — generates and returns a new one, shown exactly
+ * once the same way.
+ */
+export async function resetGuardianPassword(guardianRecordId, { password } = {}) {
+  try {
+    const res = await api.post(`/verifications/guardians/${guardianRecordId}/reset-password`, password ? { password } : {});
+    return res.data?.data;
+  } catch (err) {
+    throw toApiError(err);
+  }
+}
