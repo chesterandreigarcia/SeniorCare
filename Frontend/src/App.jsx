@@ -11,6 +11,7 @@ import BenefitsManagementPage from "./pages/dashboard/BenefitsManagementPage.jsx
 import AnnouncementsManagementPage from "./pages/dashboard/AnnouncementsManagementPage.jsx";
 import ActivitiesManagementPage from "./pages/dashboard/ActivitiesManagementPage.jsx";
 import ConcernsManagementPage from "./pages/dashboard/ConcernsManagementPage.jsx";
+import SeniorAnalyticsPage from "./pages/dashboard/SeniorAnalyticsPage.jsx";
 import SeniorDashboard from "./pages/senior/SeniorDashboard.jsx";
 import GuardianDashboard from "./pages/guardian/GuardianDashboard.jsx";
 import GuardianSeniorsPage from "./pages/guardian/GuardianSeniorsPage.jsx";
@@ -180,6 +181,17 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={VERIFICATION_ROLES}>
               <ConcernsManagementPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Barangay/Admin/LGU-OSCA Senior Mapping & Analytics — same role set
+            as verification. Backend enforces barangay scoping server-side. */}
+        <Route
+          path="/senior-analytics"
+          element={
+            <ProtectedRoute allowedRoles={VERIFICATION_ROLES}>
+              <SeniorAnalyticsPage />
             </ProtectedRoute>
           }
         />
