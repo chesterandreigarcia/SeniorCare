@@ -531,6 +531,10 @@ export default function SeniorCareRegisterPage() {
   // Final submission state (POST /api/registration).
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
+  // Captured once from the registration response so the one-time
+  // Guardian temporary password can be shown on the success screen —
+  // never persisted, never refetched, never shown again after this.
+  const [guardianCredentials, setGuardianCredentials] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -639,6 +643,11 @@ export default function SeniorCareRegisterPage() {
         newErrors.guardianRelationship = "Please select a relationship.";
       if (!form.guardianMobile)
         newErrors.guardianMobile = "Please enter a mobile number.";
+      if (!form.guardianEmail)
+        newErrors.guardianEmail =
+          "Please enter an email address — this becomes the representative's login for their Guardian account.";
+      else if (!EMAIL_FORMAT_RE.test(form.guardianEmail.trim()))
+        newErrors.guardianEmail = "Please enter a valid email address.";
     } else if (key === "guardian" && !form.hasGuardian) {
       newErrors.hasGuardian = "Please answer this question to continue.";
     }
@@ -693,9 +702,12 @@ export default function SeniorCareRegisterPage() {
       setSubmitError(null);
       setSubmitting(true);
       try {
-        await registerSeniorCitizen(form);
+        const response = await registerSeniorCitizen(form);
         // Success: never auto-login, never redirect to a dashboard —
         // just show the existing Pending Verification confirmation state.
+        if (response?.data?.guardian) {
+          setGuardianCredentials(response.data.guardian);
+        }
         setSubmitted(true);
         window.scrollTo({ top: 0, behavior: "smooth" });
       } catch (err) {
@@ -733,7 +745,7 @@ export default function SeniorCareRegisterPage() {
   };
 
   if (submitted) {
-    return <SuccessState />;
+    return <SuccessState guardianCredentials={guardianCredentials} />;
   }
 
   const currentKey = STEPS[stepIndex].key;
@@ -1461,8 +1473,14 @@ function GuardianStep({ form, set, errors, clearError }) {
               id="guardianEmail"
               label="Email Address"
               type="email"
+              required
+              helper="Used as the representative's login for their own Guardian account."
               value={form.guardianEmail}
-              onChange={(e) => set("guardianEmail", e.target.value)}
+              onChange={(e) => {
+                set("guardianEmail", e.target.value);
+                clearError("guardianEmail");
+              }}
+              error={errors.guardianEmail}
             />
           </div>
           <div className="grid sm:grid-cols-2 gap-5">
@@ -1874,7 +1892,7 @@ function ReviewStep({ form, age, errors, set, goToStep, submitError }) {
   );
 }
 
-function SuccessState() {
+function SuccessState({ guardianCredentials }) {
   const flow = [
     "Registration Submitted",
     "Barangay Reviews Information",
@@ -1921,6 +1939,29 @@ function SuccessState() {
           documents. Once your registration is approved, your account will
           become active and you can log in to access your SENIORCARE services.
         </p>
+
+        {guardianCredentials && (
+          <div
+            className="rounded-lg border-2 p-4 mb-8 text-left text-sm"
+            style={{ borderColor: COLORS.baltic, backgroundColor: COLORS.baltic + "0d" }}
+          >
+            <p className="font-bold mb-1" style={{ color: COLORS.yale }}>
+              Guardian / Authorized Representative Account Created
+            </p>
+            <p className="text-slate-600 mb-3">
+              A login account was created for your representative. It will become active once this registration
+              is approved. Save these credentials now — the temporary password will not be shown again.
+            </p>
+            <p style={{ color: COLORS.yale }}>
+              Email: <strong>{guardianCredentials.email}</strong>
+            </p>
+            {guardianCredentials.temporaryPassword && (
+              <p style={{ color: COLORS.yale }}>
+                Temporary Password: <strong>{guardianCredentials.temporaryPassword}</strong>
+              </p>
+            )}
+          </div>
+        )}
 
         <div className="flex flex-col gap-2 mb-8 text-left">
           {flow.map((step, i) => (

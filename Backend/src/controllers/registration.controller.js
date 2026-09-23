@@ -22,6 +22,17 @@ export async function register(req, res, next) {
       data: {
         status: "PENDING_VERIFICATION",
         seniorId: result.seniorId,
+        // Present only when a Guardian/Authorized Representative was
+        // submitted. The temporary password is included exactly once,
+        // in this one response — it is never retrievable again after
+        // this, so the frontend must capture/display it now.
+        guardian: result.guardian
+          ? {
+              email: result.guardian.email,
+              temporaryPassword: result.guardian.temporaryPassword,
+              status: "PENDING_VERIFICATION",
+            }
+          : null,
       },
     });
   } catch (err) {

@@ -1,22 +1,11 @@
-import crypto from "node:crypto";
 import Barangay from "../models/Barangay.js";
 import User from "../models/User.js";
 import Senior from "../models/Senior.js";
 import Guardian from "../models/Guardian.js";
 import { ROLES, ACCOUNT_STATUS } from "../utils/constants.js";
-import { hashPassword } from "../utils/password.js";
+import { hashPassword, generateTemporaryPassword } from "../utils/password.js";
 import { hasBroadBarangayAccess } from "../utils/barangayScope.js";
 import { NotFoundError, ConflictError, ValidationError } from "../utils/errors.js";
-
-/**
- * Generates a secure random temporary password for a newly-provisioned
- * staff account when the admin doesn't supply one directly. Guaranteed to
- * satisfy the existing password policy (8+ chars, uppercase, number).
- */
-function generateTemporaryPassword() {
-  const raw = crypto.randomBytes(9).toString("base64url"); // ~12 chars, mixed case
-  return `Sc${raw}1`; // prefix/suffix guarantee an uppercase letter + a digit
-}
 
 // ---------------------------------------------------------------------
 // Barangays
@@ -130,11 +119,26 @@ export async function getStaffById(staffId) {
 // ---------------------------------------------------------------------
 
 /**
- * Provisions a login for an already-authorization-confirmed Guardian
- * record — mirrors createStaffAccount above almost exactly (temp
- * password, hashing, uniqueness check), just for a Guardian instead of
- * a Barangay Staff member. `role` is hardcoded, never accepted from the
- * client, same as every other account-creation path in this file.
+ * LEGACY / RECOVERY PATH ONLY.
+ *
+ * As of the registration-based Guardian flow (see
+ * registration.service.js's registerSenior), a Guardian's login account
+ * is created automatically as part of Senior Registration, and Admin
+ * verification only activates it (see verification.service.js's
+ * approveVerification) — Admin no longer needs to click "Create
+ * Guardian Login" as part of the normal workflow.
+ *
+ * This function remains only for Guardian records that exist without a
+ * linked User account — e.g. Guardian records created before this
+ * change shipped. The Admin/Staff UI hides the normal "Create Guardian
+ * Login" action once `guardian.userId` is already set (which it will be
+ * for every Guardian registered going forward) and only surfaces this
+ * as a fallback for those older, account-less records.
+ *
+ * Mirrors createStaffAccount above almost exactly (temp password,
+ * hashing, uniqueness check), just for a Guardian instead of a Barangay
+ * Staff member. `role` is hardcoded, never accepted from the client,
+ * same as every other account-creation path in this file.
  *
  * A Guardian record only becomes eligible once Barangay Staff has
  * confirmed the authorization documents during the Senior's own

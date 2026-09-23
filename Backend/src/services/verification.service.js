@@ -92,7 +92,11 @@ export async function getVerificationById(verificationId, requestingUser) {
 
   const senior = verification.seniorId;
   const [guardian, documents] = await Promise.all([
-    senior?.guardianId ? Guardian.findById(senior.guardianId) : null,
+    // Populate the linked login account's status/email so the Admin/Staff
+    // review UI can show "Account Created — Pending/Active" without a
+    // second request. Guardian.userId is set at registration time now
+    // (see registration.service.js), not by an Admin action.
+    senior?.guardianId ? Guardian.findById(senior.guardianId).populate("userId", "status email") : null,
     Document.find({ seniorId: senior?._id }).select("-storageKey"),
   ]);
 
@@ -212,20 +216,26 @@ export async function approveVerification(verificationId, requestingUser, { rema
 
       // Approving a Senior's registration also confirms the authorization
       // documents for their Guardian/Authorized Representative, if one was
-      // submitted — this is the ONE place that was ever supposed to flip
-      // Guardian.authorizationConfirmed to true, and until this fix nothing
-      // in the codebase ever did. Without it, a Guardian login could never
-      // actually be provisioned (see admin.service.js's createGuardianAccount,
-      // which requires authorizationConfirmed) no matter what the Staff/Admin
-      // UI appeared to do. This does not create or touch any User account —
-      // it only marks the Guardian record itself as confirmed; a distinct
-      // GUARDIAN-role login is still provisioned separately (see below).
+      // submitted, and — since registration.service.js now creates the
+      // Guardian's login account up front (PENDING_VERIFICATION) instead
+      // of Admin creating it later — this is also the one place that
+      // activates it. Admin verification owns approval/activation only;
+      // it no longer owns account creation (see admin.service.js's
+      // createGuardianAccount, now a legacy/recovery path for Guardian
+      // records that predate this change and never got a userId here).
       if (senior.guardianId) {
-        await Guardian.findByIdAndUpdate(
+        const guardian = await Guardian.findByIdAndUpdate(
           senior.guardianId,
           { authorizationConfirmed: true },
-          { session }
+          { session, new: true }
         );
+        if (guardian?.userId) {
+          await User.findByIdAndUpdate(
+            guardian.userId,
+            { status: ACCOUNT_STATUS.ACTIVE },
+            { session }
+          );
+        }
       }
 
       result = verification;
@@ -292,6 +302,22 @@ export async function rejectVerification(verificationId, requestingUser, { reaso
         { status: ACCOUNT_STATUS.REJECTED },
         { session }
       );
+
+      // A Guardian account created during registration (see
+      // registration.service.js) must never become an active login if
+      // the Senior's registration it belongs to is rejected — it was
+      // only ever PENDING_VERIFICATION, so flip it to REJECTED the same
+      // way the Senior's own account is rejected above.
+      if (senior.guardianId) {
+        const guardian = await Guardian.findById(senior.guardianId).session(session);
+        if (guardian?.userId) {
+          await User.findByIdAndUpdate(
+            guardian.userId,
+            { status: ACCOUNT_STATUS.REJECTED },
+            { session }
+          );
+        }
+      }
 
       result = verification;
     });

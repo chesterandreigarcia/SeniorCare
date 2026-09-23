@@ -5,7 +5,7 @@ import Guardian from "../models/Guardian.js";
 import Barangay from "../models/Barangay.js";
 import Verification from "../models/Verification.js";
 import Document from "../models/Document.js";
-import { hashPassword } from "../utils/password.js";
+import { hashPassword, generateTemporaryPassword } from "../utils/password.js";
 import { ROLES, ACCOUNT_STATUS, VERIFICATION_STATUS, MINIMUM_SENIOR_AGE, DOCUMENT_TYPES } from "../utils/constants.js";
 import { ValidationError, ConflictError, NotFoundError } from "../utils/errors.js";
 
@@ -60,7 +60,29 @@ export async function registerSenior(data, uploadedFiles = {}) {
     }
   }
 
+  // A Guardian/Authorized Representative account is created as part of
+  // this same registration (see below) whenever one is submitted — so
+  // its email needs the same defense-in-depth duplicate checks the
+  // Senior's own accountEmail gets above, before any writes happen.
+  const hasGuardian = Boolean(data.guardian?.hasGuardian);
+  if (hasGuardian) {
+    const guardianEmail = data.guardian.email.toLowerCase();
+    if (guardianEmail === data.accountEmail.toLowerCase()) {
+      throw new ValidationError("The Guardian's email must be different from the Senior's account email.", {
+        "guardian.email": "This email is already used for the Senior's own account.",
+      });
+    }
+    const guardianEmailInUse = await User.findOne({ email: guardianEmail });
+    if (guardianEmailInUse) {
+      throw new ConflictError("An account with this Guardian email already exists.", {
+        "guardian.email": "Email already registered.",
+      });
+    }
+  }
+
   const passwordHash = await hashPassword(data.password);
+  const guardianTemporaryPassword = hasGuardian ? generateTemporaryPassword() : null;
+  const guardianPasswordHash = hasGuardian ? await hashPassword(guardianTemporaryPassword) : null;
 
   const session = await mongoose.startSession();
   try {
@@ -101,7 +123,29 @@ export async function registerSenior(data, uploadedFiles = {}) {
       );
 
       let guardian = null;
-      if (data.guardian?.hasGuardian) {
+      if (hasGuardian) {
+        // The Guardian's own login account is created right here, during
+        // registration, rather than later via a separate Admin action
+        // (see admin.service.js's createGuardianAccount, which now only
+        // exists as a legacy/recovery path for Guardian records that
+        // predate this change). It starts PENDING_VERIFICATION — the
+        // same status the Senior's own account gets — and only becomes
+        // ACTIVE once Admin/Staff approves this registration (see
+        // verification.service.js's approveVerification), exactly
+        // mirroring how the Senior's account is activated.
+        const [guardianUser] = await User.create(
+          [
+            {
+              email: data.guardian.email.toLowerCase(),
+              passwordHash: guardianPasswordHash,
+              role: ROLES.GUARDIAN,
+              status: ACCOUNT_STATUS.PENDING_VERIFICATION,
+              assignedBarangayId: null,
+            },
+          ],
+          { session }
+        );
+
         const [g] = await Guardian.create(
           [
             {
@@ -116,6 +160,7 @@ export async function registerSenior(data, uploadedFiles = {}) {
               address: data.guardian.address,
               idType: data.guardian.idType,
               idNumber: data.guardian.idNumber,
+              userId: guardianUser._id,
             },
           ],
           { session }
@@ -152,7 +197,19 @@ export async function registerSenior(data, uploadedFiles = {}) {
         await Document.insertMany(docs, { session });
       }
 
-      result = { userId: user._id, seniorId: senior._id, verificationId: verification._id };
+      result = {
+        userId: user._id,
+        seniorId: senior._id,
+        verificationId: verification._id,
+        // Only ever populated/returned from this one registration
+        // response — never persisted in plaintext and never returned by
+        // any other endpoint afterward. Preserves the same "shown once"
+        // convention admin.service.js already uses for Staff/Guardian
+        // temporary passwords.
+        guardian: guardian
+          ? { guardianRecordId: guardian._id, email: guardian.email, temporaryPassword: guardianTemporaryPassword }
+          : null,
+      };
     });
 
     return result;

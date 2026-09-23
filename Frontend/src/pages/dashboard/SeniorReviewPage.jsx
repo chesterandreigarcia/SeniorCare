@@ -78,12 +78,25 @@ function GuardianAccountAction({ guardian, verificationStatus, onCreated }) {
     }
   };
 
+  // As of the registration-based Guardian flow, guardian.userId is set
+  // during Senior Registration itself (see registration.service.js) —
+  // Admin no longer creates this account. guardian.userId now comes back
+  // populated ({ _id, status, email }, see verification.service.js's
+  // getVerificationById) so we can show its actual status here instead
+  // of just "has an account".
   if (guardian.userId) {
+    const accountStatus = guardian.userId.status;
+    const isActive = accountStatus === "ACTIVE";
     return (
       <div className="mt-2">
-        <p className="flex items-center gap-2 text-sm font-semibold" style={{ color: "#2f7d43" }}>
+        <p className="flex items-center gap-2 text-sm font-semibold" style={{ color: isActive ? "#2f7d43" : COLORS.yale }}>
           <CheckCircle2 className="w-4 h-4" aria-hidden="true" />
-          This Guardian already has a login account.
+          {isActive ? "Guardian Account — Active" : "Guardian Account Created — Pending Verification"}
+        </p>
+        <p className="text-xs text-slate-500 mt-1">
+          {isActive
+            ? "This Guardian can log in and access their Guardian Dashboard."
+            : "Created automatically during registration. It becomes active once this registration is approved."}
         </p>
         <button
           type="button"
@@ -103,6 +116,10 @@ function GuardianAccountAction({ guardian, verificationStatus, onCreated }) {
     );
   }
 
+  // Fallback path — only reachable for Guardian records that predate the
+  // registration-based flow and were never given a login account. Every
+  // Guardian registered going forward already has guardian.userId set
+  // above, so this button is not part of the normal workflow anymore.
   if (verificationStatus !== "APPROVED") {
     return (
       <p className="text-sm text-slate-500 mt-2">
@@ -129,6 +146,11 @@ function GuardianAccountAction({ guardian, verificationStatus, onCreated }) {
 
   return (
     <div className="mt-3">
+      <p className="text-xs text-slate-500 mb-2">
+        This Guardian record has no login account yet, which is unusual for a registration submitted after this
+        workflow changed — new registrations create the account automatically. Use this only to manually
+        provision one for an older record.
+      </p>
       {!showForm ? (
         <button
           type="button"

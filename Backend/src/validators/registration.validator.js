@@ -25,7 +25,11 @@ const guardianSchema = z
     suffix: z.string().trim().max(10).optional().default(""),
     relationship: z.nativeEnum(RELATIONSHIP_TYPES).optional(),
     mobileNumber: z.string().trim().optional(),
-    email: z.string().trim().email().optional().or(z.literal("")).default(""),
+    // Required (not just optional/valid-if-present) whenever hasGuardian
+    // is true — this email becomes the Guardian's own login username, so
+    // registration cannot create a Guardian account without one. See the
+    // superRefine below.
+    email: z.string().trim().toLowerCase().email().optional().or(z.literal("")).default(""),
     address: z.string().trim().max(300).optional().default(""),
     idType: z.string().trim().max(100).optional().default(""),
     idNumber: z.string().trim().max(100).optional().default(""),
@@ -43,6 +47,17 @@ const guardianSchema = z
     }
     if (!data.mobileNumber) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Guardian mobile number is required.", path: ["mobileNumber"] });
+    }
+    // A Guardian/Authorized Representative account is created during
+    // registration (see registration.service.js), and that account's
+    // login username is this email — so it can no longer be optional
+    // once a Guardian is being registered.
+    if (!data.email) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "An email address is required to create the Guardian's login account.",
+        path: ["email"],
+      });
     }
   });
 
