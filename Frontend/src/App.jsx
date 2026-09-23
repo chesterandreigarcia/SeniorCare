@@ -12,6 +12,7 @@ import AnnouncementsManagementPage from "./pages/dashboard/AnnouncementsManageme
 import ActivitiesManagementPage from "./pages/dashboard/ActivitiesManagementPage.jsx";
 import ConcernsManagementPage from "./pages/dashboard/ConcernsManagementPage.jsx";
 import SeniorAnalyticsPage from "./pages/dashboard/SeniorAnalyticsPage.jsx";
+import AdminReportsPage from "./pages/dashboard/AdminReportsPage.jsx";
 import SeniorDashboard from "./pages/senior/SeniorDashboard.jsx";
 import GuardianDashboard from "./pages/guardian/GuardianDashboard.jsx";
 import GuardianSeniorsPage from "./pages/guardian/GuardianSeniorsPage.jsx";
@@ -196,7 +197,20 @@ function App() {
           }
         />
 
-        {/* Admin-only organizational management. */}
+        {/* Admin-only organizational management + system-wide reporting.
+            ADMIN only — intentionally narrower than VERIFICATION_ROLES
+            (BARANGAY_STAFF/LGU_OSCA excluded), per the module's own
+            "keep Admin Reports separate from Barangay Analytics"
+            requirement. Backend (adminReports.routes.js's adminOnly)
+            enforces this independently of this frontend guard. */}
+        <Route
+          path="/admin/reports"
+          element={
+            <ProtectedRoute allowedRoles={["ADMIN"]}>
+              <AdminReportsPage />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/admin/barangays"
           element={

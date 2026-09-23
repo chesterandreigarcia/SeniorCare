@@ -102,12 +102,23 @@ function ageBucketSwitch() {
  * only ACTIVE accounts. Returns `null` if the scope has zero barangays
  * (Staff with no assignment) — callers must check for that and return an
  * empty/zeroed result rather than running an unscoped query.
+ *
+ * `dateRange` (optional { from, to }, either end omittable) filters by
+ * Senior.createdAt — the registration timestamp Mongoose's own
+ * `{ timestamps: true }` already provides (see Senior.js), not a new
+ * field. Omitting it (every existing caller before Admin System Reports)
+ * behaves exactly as before — unfiltered by date.
  */
-function activeSeniorPipeline(scope) {
+function activeSeniorPipeline(scope, dateRange) {
   if (scope.mode === "single" && scope.barangayIds.length === 0) return null;
   const match = {};
   if (scope.mode === "single") {
     match.barangayId = new mongoose.Types.ObjectId(scope.barangayIds[0]);
+  }
+  if (dateRange?.from || dateRange?.to) {
+    match.createdAt = {};
+    if (dateRange.from) match.createdAt.$gte = dateRange.from;
+    if (dateRange.to) match.createdAt.$lte = dateRange.to;
   }
   return [
     { $match: match },
@@ -120,13 +131,15 @@ function activeSeniorPipeline(scope) {
 /**
  * Full analytics payload for either a single barangay (Staff, or
  * LGU/Admin with a `barangayId` filter) or a consolidated multi-barangay
- * view (LGU/Admin with no filter). Powers both the Barangay Staff
- * Analytics page and the LGU/OSCA consolidated view — the shape is the
- * same either way, with `byBarangay` only populated in consolidated mode.
+ * view (LGU/Admin with no filter, or ADMIN via Admin System Reports).
+ * Powers the Barangay Staff Analytics page, the LGU/OSCA consolidated
+ * view, and (reused, not duplicated — see adminReports.service.js)
+ * Admin System Reports' own senior/demographic/pension/application
+ * sections. `dateRange` is optional and unused by the first two callers.
  */
-export async function getSeniorAnalytics(requestingUser, { barangayId } = {}) {
+export async function getSeniorAnalytics(requestingUser, { barangayId, dateRange } = {}) {
   const scope = resolveScope(requestingUser, barangayId);
-  const pipeline = activeSeniorPipeline(scope);
+  const pipeline = activeSeniorPipeline(scope, dateRange);
 
   const empty = {
     scope: scope.mode,

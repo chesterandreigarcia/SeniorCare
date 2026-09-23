@@ -21,6 +21,7 @@ import activityRoutes from "./routes/activity.routes.js";
 import concernRoutes from "./routes/concern.routes.js";
 import guardianRoutes from "./routes/guardian.routes.js";
 import analyticsRoutes from "./routes/analytics.routes.js";
+import adminReportsRoutes from "./routes/adminReports.routes.js";
 import { notFoundHandler, errorHandler } from "./middleware/error.middleware.js";
 import { getBarangays } from "./controllers/registration.controller.js";
 
@@ -63,6 +64,7 @@ export function createApp() {
   app.use("/api/concerns", concernRoutes);
   app.use("/api/guardian", guardianRoutes);
   app.use("/api/analytics", analyticsRoutes);
+  app.use("/api/admin-reports", adminReportsRoutes);
   // Convenience alias — same handler as GET /api/registration/barangays.
   app.get("/api/barangays", getBarangays);
 
