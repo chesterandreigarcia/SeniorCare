@@ -1,5 +1,17 @@
 import * as adminReportsService from "../services/adminReports.service.js";
 import { toCsv, sendCsv } from "../utils/csv.js";
+import { safeCreateAuditLog } from "../services/auditLog.service.js";
+import { AUDIT_ACTIONS, AUDIT_MODULES } from "../utils/constants.js";
+
+function auditExport(req, reportType) {
+  return safeCreateAuditLog({
+    actor: req.user,
+    action: AUDIT_ACTIONS.EXPORT,
+    module: AUDIT_MODULES.REPORTS,
+    description: `${req.user.role} exported the ${reportType} report as CSV.`,
+    metadata: { reportType, filters: filtersFromQuery(req) },
+  });
+}
 
 // Every handler is reachable only via adminOnly (see adminReports.routes.js)
 // — req.user.role is guaranteed ADMIN before any of these run.
@@ -60,6 +72,7 @@ export async function exportBarangaySummaryCsv(req, res, next) {
       { key: "pensionBeneficiaries", label: "Pension Beneficiaries" },
       { key: "activeApplications", label: "Active Applications" },
     ]);
+    await auditExport(req, "BARANGAY_SUMMARY");
     sendCsv(res, "barangay-summary.csv", csv);
   } catch (err) {
     next(err);
@@ -82,6 +95,7 @@ export async function exportDemographicsCsv(req, res, next) {
       { key: "metric", label: "Metric" },
       { key: "value", label: "Value" },
     ]);
+    await auditExport(req, "SENIOR_DEMOGRAPHICS");
     sendCsv(res, "senior-demographics.csv", csv);
   } catch (err) {
     next(err);
@@ -104,6 +118,7 @@ export async function exportPensionCsv(req, res, next) {
       { key: "metric", label: "Metric" },
       { key: "value", label: "Value" },
     ]);
+    await auditExport(req, "PENSION_STATISTICS");
     sendCsv(res, "pension-statistics.csv", csv);
   } catch (err) {
     next(err);
@@ -120,6 +135,7 @@ export async function exportApplicationsCsv(req, res, next) {
         { key: "count", label: "Count" },
       ]
     );
+    await auditExport(req, "ASSISTANCE_APPLICATIONS");
     sendCsv(res, "assistance-applications.csv", csv);
   } catch (err) {
     next(err);
@@ -138,6 +154,7 @@ export async function exportUserStatsCsv(req, res, next) {
       { key: "metric", label: "Metric" },
       { key: "value", label: "Value" },
     ]);
+    await auditExport(req, "USER_STATISTICS");
     sendCsv(res, "user-statistics.csv", csv);
   } catch (err) {
     next(err);

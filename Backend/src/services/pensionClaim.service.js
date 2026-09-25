@@ -5,11 +5,12 @@ import PensionSchedule from "../models/PensionSchedule.js";
 import PensionClaim from "../models/PensionClaim.js";
 import Pension from "../models/Pension.js";
 import Senior from "../models/Senior.js";
-import { CLAIM_STATUS, SCHEDULE_STATUS, NOTIFICATION_TYPE } from "../utils/constants.js";
+import { CLAIM_STATUS, SCHEDULE_STATUS, NOTIFICATION_TYPE, AUDIT_ACTIONS, AUDIT_MODULES } from "../utils/constants.js";
 import { NotFoundError, ConflictError, ValidationError, AuthorizationError } from "../utils/errors.js";
 import { assertCanAccessBarangay } from "../utils/barangayScope.js";
 import { sweepMissedClaims, sweepMissedClaim } from "../utils/claimWindow.js";
 import { createNotification } from "./notification.service.js";
+import { safeCreateAuditLog } from "./auditLog.service.js";
 
 // Human-readable messages for claims that can no longer be claimed —
 // shared by the QR resolve/confirm paths so Staff always see a clear,
@@ -282,6 +283,22 @@ export async function confirmClaim(requestingUser, qrToken) {
     eventType: "PENSION_CLAIM_CLAIMED",
     title: "Pension Claimed",
     message: "Your pension claim has been successfully completed.",
+  });
+
+  // Who confirmed the claim is specifically called out as important by
+  // this module's own requirements — pension claiming is a sensitive
+  // operational action, and `verifiedBy` above already records this in
+  // the claim itself, but the Audit Logs page is where an Administrator
+  // actually reviews it without opening each claim individually.
+  await safeCreateAuditLog({
+    actor: requestingUser,
+    action: AUDIT_ACTIONS.CLAIM,
+    module: AUDIT_MODULES.PENSION,
+    entityType: "PensionClaim",
+    entityId: updated._id,
+    description: `${requestingUser.role} confirmed a pension claim for ${updated.seniorId?.firstName || "a Senior"} ${updated.seniorId?.lastName || ""}.`.trim(),
+    metadata: { seniorId: updated.seniorId?._id, statusFrom: CLAIM_STATUS.SCHEDULED, statusTo: CLAIM_STATUS.CLAIMED },
+    barangayId: updated.barangayId,
   });
 
   return updated;

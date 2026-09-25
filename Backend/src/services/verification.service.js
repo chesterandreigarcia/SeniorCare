@@ -7,9 +7,10 @@ import Guardian from "../models/Guardian.js";
 import Document from "../models/Document.js";
 import User from "../models/User.js";
 import Barangay from "../models/Barangay.js";
-import { ACCOUNT_STATUS, VERIFICATION_STATUS, ROLES, NOTIFICATION_TYPE } from "../utils/constants.js";
+import { ACCOUNT_STATUS, VERIFICATION_STATUS, ROLES, NOTIFICATION_TYPE, AUDIT_ACTIONS, AUDIT_MODULES } from "../utils/constants.js";
 import { NotFoundError, AuthorizationError, ConflictError } from "../utils/errors.js";
 import { createNotification } from "./notification.service.js";
+import { safeCreateAuditLog } from "./auditLog.service.js";
 
 /**
  * Returns pending verifications, scoped to the requesting staff member's
@@ -188,6 +189,7 @@ function assertBarangayScope(verification, requestingUser) {
 export async function approveVerification(verificationId, requestingUser, { remarks } = {}) {
   const session = await mongoose.startSession();
   let result;
+  let guardianActivated = null;
   try {
     await session.withTransaction(async () => {
       const verification = await Verification.findById(verificationId).session(session);
@@ -235,6 +237,7 @@ export async function approveVerification(verificationId, requestingUser, { rema
             { status: ACCOUNT_STATUS.ACTIVE },
             { session }
           );
+          guardianActivated = { guardianId: guardian._id, guardianUserId: guardian.userId };
         }
       }
 
@@ -256,6 +259,30 @@ export async function approveVerification(verificationId, requestingUser, { rema
     title: "Registration Verified",
     message: "Your SENIORCARE registration has been verified and approved. Your account is now active.",
   });
+
+  await safeCreateAuditLog({
+    actor: requestingUser,
+    action: AUDIT_ACTIONS.APPROVE,
+    module: AUDIT_MODULES.VERIFICATION,
+    entityType: "Senior",
+    entityId: result.seniorId,
+    description: `${requestingUser.role} approved a Senior registration.`,
+    metadata: { verificationId: result._id, statusFrom: VERIFICATION_STATUS.PENDING, statusTo: VERIFICATION_STATUS.APPROVED },
+    barangayId: result.barangayId,
+  });
+
+  if (guardianActivated) {
+    await safeCreateAuditLog({
+      actor: requestingUser,
+      action: AUDIT_ACTIONS.ACTIVATE,
+      module: AUDIT_MODULES.GUARDIAN,
+      entityType: "Guardian",
+      entityId: guardianActivated.guardianId,
+      description: `${requestingUser.role} activated a Guardian account as part of Senior verification approval.`,
+      metadata: { guardianUserId: guardianActivated.guardianUserId, statusTo: ACCOUNT_STATUS.ACTIVE },
+      barangayId: result.barangayId,
+    });
+  }
 
   return result;
 }
@@ -329,6 +356,17 @@ export async function rejectVerification(verificationId, requestingUser, { reaso
     eventType: "VERIFICATION_REJECTED",
     title: "Registration Rejected",
     message: `Your SENIORCARE registration was rejected. Reason: ${reason}`,
+  });
+
+  await safeCreateAuditLog({
+    actor: requestingUser,
+    action: AUDIT_ACTIONS.REJECT,
+    module: AUDIT_MODULES.VERIFICATION,
+    entityType: "Senior",
+    entityId: result.seniorId,
+    description: `${requestingUser.role} rejected a Senior registration.`,
+    metadata: { verificationId: result._id, statusFrom: VERIFICATION_STATUS.PENDING, statusTo: VERIFICATION_STATUS.REJECTED, reason },
+    barangayId: result.barangayId,
   });
 
   return result;

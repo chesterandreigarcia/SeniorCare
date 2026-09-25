@@ -13,6 +13,7 @@ import ActivitiesManagementPage from "./pages/dashboard/ActivitiesManagementPage
 import ConcernsManagementPage from "./pages/dashboard/ConcernsManagementPage.jsx";
 import SeniorAnalyticsPage from "./pages/dashboard/SeniorAnalyticsPage.jsx";
 import AdminReportsPage from "./pages/dashboard/AdminReportsPage.jsx";
+import AuditLogsPage from "./pages/dashboard/AuditLogsPage.jsx";
 import SeniorDashboard from "./pages/senior/SeniorDashboard.jsx";
 import GuardianDashboard from "./pages/guardian/GuardianDashboard.jsx";
 import GuardianSeniorsPage from "./pages/guardian/GuardianSeniorsPage.jsx";
@@ -208,6 +209,14 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={["ADMIN"]}>
               <AdminReportsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/audit-logs"
+          element={
+            <ProtectedRoute allowedRoles={["ADMIN"]}>
+              <AuditLogsPage />
             </ProtectedRoute>
           }
         />

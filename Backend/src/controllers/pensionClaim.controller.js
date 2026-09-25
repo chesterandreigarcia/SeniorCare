@@ -1,5 +1,7 @@
 import * as claimService from "../services/pensionClaim.service.js";
 import { resolveActingSenior } from "../utils/guardianAccess.js";
+import { safeCreateAuditLog } from "../services/auditLog.service.js";
+import { AUDIT_ACTIONS, AUDIT_MODULES, CLAIM_STATUS } from "../utils/constants.js";
 
 // These 5 functions resolve the acting Senior via resolveActingSenior()
 // so an authorized Guardian can act for their managed Senior, then pass
@@ -84,6 +86,18 @@ export async function cancelClaim(req, res, next) {
   try {
     const senior = await resolveActingSenior(req.user, req.query.seniorId);
     const claim = await claimService.cancelClaim(senior.userId, req.params.id);
+    // req.user is the actual actor (may be a Guardian acting for
+    // `senior`, per resolveActingSenior above) — always the authenticated
+    // caller, never the Senior's own id when a Guardian is acting.
+    await safeCreateAuditLog({
+      actor: req.user,
+      action: AUDIT_ACTIONS.CANCEL,
+      module: AUDIT_MODULES.PENSION,
+      entityType: "PensionClaim",
+      entityId: claim._id,
+      description: `${req.user.role} cancelled a pension claim booking.`,
+      metadata: { seniorId: senior._id, statusFrom: CLAIM_STATUS.SCHEDULED, statusTo: CLAIM_STATUS.CANCELLED },
+    });
     res.status(200).json({ success: true, data: claim });
   } catch (err) {
     next(err);

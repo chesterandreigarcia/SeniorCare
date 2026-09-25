@@ -2,10 +2,11 @@ import Barangay from "../models/Barangay.js";
 import User from "../models/User.js";
 import Senior from "../models/Senior.js";
 import Guardian from "../models/Guardian.js";
-import { ROLES, ACCOUNT_STATUS } from "../utils/constants.js";
+import { ROLES, ACCOUNT_STATUS, AUDIT_ACTIONS, AUDIT_MODULES } from "../utils/constants.js";
 import { hashPassword, generateTemporaryPassword } from "../utils/password.js";
 import { hasBroadBarangayAccess } from "../utils/barangayScope.js";
 import { NotFoundError, ConflictError, ValidationError } from "../utils/errors.js";
+import { safeCreateAuditLog } from "./auditLog.service.js";
 
 // ---------------------------------------------------------------------
 // Barangays
@@ -195,6 +196,17 @@ export async function createGuardianAccount(requestingUser, guardianRecordId, da
   guardian.userId = user._id;
   await guardian.save();
 
+  await safeCreateAuditLog({
+    actor: requestingUser,
+    action: AUDIT_ACTIONS.CREATE,
+    module: AUDIT_MODULES.GUARDIAN,
+    entityType: "Guardian",
+    entityId: guardian._id,
+    description: `${requestingUser.role} created a legacy Guardian login account (${user.email}).`,
+    metadata: { guardianUserId: user._id, seniorId: senior._id },
+    barangayId: senior.barangayId,
+  });
+
   return {
     user,
     guardian,
@@ -230,6 +242,17 @@ export async function resetGuardianPassword(requestingUser, guardianRecordId, da
 
   const user = await User.findByIdAndUpdate(guardian.userId, { passwordHash }, { new: true });
   if (!user) throw new NotFoundError("This Guardian's login account no longer exists.");
+
+  await safeCreateAuditLog({
+    actor: requestingUser,
+    action: AUDIT_ACTIONS.RESET_PASSWORD,
+    module: AUDIT_MODULES.GUARDIAN,
+    entityType: "Guardian",
+    entityId: guardian._id,
+    description: `${requestingUser.role} reset the login password for a Guardian account (${user.email}).`,
+    metadata: { guardianUserId: user._id, seniorId: senior._id },
+    barangayId: senior.barangayId,
+  });
 
   return {
     user,

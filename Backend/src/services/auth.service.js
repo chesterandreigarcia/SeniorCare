@@ -7,8 +7,9 @@ import {
   isPasswordStrongEnough,
 } from "../utils/password.js";
 import { signAccessToken, signRefreshToken } from "../utils/token.js";
-import { ACCOUNT_STATUS, ROLES } from "../utils/constants.js";
+import { ACCOUNT_STATUS, ROLES, AUDIT_ACTIONS, AUDIT_MODULES } from "../utils/constants.js";
 import { listAuthorizedSeniorsForGuardian } from "../utils/guardianAccess.js";
+import { safeCreateAuditLog } from "./auditLog.service.js";
 import {
   AuthenticationError,
   AccountStatusError,
@@ -22,7 +23,7 @@ import {
 // the core registration/verification/auth architecture.
 const resetTokenStore = new Map();
 
-export async function login({ emailOrUsername, password }) {
+export async function login({ emailOrUsername, password }, { ipAddress } = {}) {
   const normalized = emailOrUsername.trim().toLowerCase();
 
   const user = await User.findOne({
@@ -71,6 +72,21 @@ export async function login({ emailOrUsername, password }) {
 
   user.lastLoginAt = new Date();
   await user.save();
+
+  // Fired only after the login itself has fully succeeded (password
+  // verified, status checked, lastLoginAt already saved) — never allowed
+  // to turn a successful login into a failed request (see
+  // auditLog.service.js's error-handling rationale).
+  await safeCreateAuditLog({
+    actor: { id: user._id.toString(), role: user.role },
+    actorEmail: user.email,
+    action: AUDIT_ACTIONS.LOGIN,
+    module: AUDIT_MODULES.AUTH,
+    entityType: "User",
+    entityId: user._id,
+    description: `${user.role} logged in.`,
+    metadata: ipAddress ? { ipAddress } : {},
+  });
 
   const accessToken = signAccessToken({
     userId: user._id.toString(),
@@ -216,4 +232,14 @@ export async function resetPassword({ token, newPassword }) {
   await user.save();
 
   record.used = true;
+
+  await safeCreateAuditLog({
+    actor: { id: user._id.toString(), role: user.role },
+    actorEmail: user.email,
+    action: AUDIT_ACTIONS.PASSWORD_RESET,
+    module: AUDIT_MODULES.AUTH,
+    entityType: "User",
+    entityId: user._id,
+    description: `${user.role} reset their own password via the forgot-password flow.`,
+  });
 }

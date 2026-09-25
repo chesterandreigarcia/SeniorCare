@@ -4,12 +4,26 @@ import BenefitProgram from "../models/BenefitProgram.js";
 import Document from "../models/Document.js";
 import Senior from "../models/Senior.js";
 import User from "../models/User.js";
-import { APPLICATION_STATUS, ACCOUNT_STATUS, DOCUMENT_TYPES, ROLES, NOTIFICATION_TYPE } from "../utils/constants.js";
+import { APPLICATION_STATUS, ACCOUNT_STATUS, DOCUMENT_TYPES, ROLES, NOTIFICATION_TYPE, AUDIT_ACTIONS, AUDIT_MODULES } from "../utils/constants.js";
 import { NotFoundError, ConflictError, ValidationError, AuthorizationError } from "../utils/errors.js";
 import { assertCanAccessBarangay, hasBroadBarangayAccess } from "../utils/barangayScope.js";
 import { resolveActingSenior } from "../utils/guardianAccess.js";
 import { computeEligibility } from "./benefitProgram.service.js";
 import { createNotification } from "./notification.service.js";
+import { safeCreateAuditLog } from "./auditLog.service.js";
+
+function auditApplicationAction(application, requestingUser, action, description, statusTo, extra = {}) {
+  return safeCreateAuditLog({
+    actor: requestingUser,
+    action,
+    module: AUDIT_MODULES.BENEFITS,
+    entityType: "BenefitApplication",
+    entityId: application._id,
+    description,
+    metadata: { statusTo, seniorId: application.seniorId, programId: application.programId, ...extra },
+    barangayId: application.barangayId,
+  });
+}
 
 const SENIOR_SUMMARY_FIELDS = "firstName lastName seniorCitizenId barangayId";
 
@@ -293,6 +307,14 @@ export async function rejectApplication(applicationId, requestingUser, { reason 
     title: "Application Rejected",
     message: `Your benefit application was rejected. Reason: ${reason}`,
   });
+  await auditApplicationAction(
+    application,
+    requestingUser,
+    AUDIT_ACTIONS.REJECT,
+    `${requestingUser.role} rejected a benefit application.`,
+    APPLICATION_STATUS.REJECTED,
+    { reason }
+  );
   return application;
 }
 
@@ -314,6 +336,13 @@ export async function approveApplication(applicationId, requestingUser, { remark
     title: "Application Approved",
     message: "Your benefit application has been approved.",
   });
+  await auditApplicationAction(
+    application,
+    requestingUser,
+    AUDIT_ACTIONS.APPROVE,
+    `${requestingUser.role} approved a benefit application.`,
+    APPLICATION_STATUS.APPROVED
+  );
   return application;
 }
 
@@ -332,6 +361,13 @@ export async function releaseApplication(applicationId, requestingUser, { remark
     title: "Benefit Released",
     message: "Your approved benefit has been released. Please coordinate with your Barangay office to claim it.",
   });
+  await auditApplicationAction(
+    application,
+    requestingUser,
+    AUDIT_ACTIONS.RELEASE,
+    `${requestingUser.role} released a benefit to a Senior.`,
+    APPLICATION_STATUS.RELEASED
+  );
   return application;
 }
 
@@ -349,5 +385,12 @@ export async function completeApplication(applicationId, requestingUser, { remar
     title: "Application Completed",
     message: "Your benefit application has been marked as completed. Thank you.",
   });
+  await auditApplicationAction(
+    application,
+    requestingUser,
+    AUDIT_ACTIONS.COMPLETE,
+    `${requestingUser.role} marked a benefit application as completed.`,
+    APPLICATION_STATUS.CLAIMED
+  );
   return application;
 }

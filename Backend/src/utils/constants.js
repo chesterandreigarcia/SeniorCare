@@ -238,3 +238,36 @@ export const ACTIVITY_CATEGORY = Object.freeze({
   LIVELIHOOD: "LIVELIHOOD",
   GENERAL: "GENERAL",
 });
+
+// ---- Audit Logs ----
+// Only actions/modules actually emitted by a real call site (see
+// auditLog.service.js and its callers) belong here — this is a closed
+// vocabulary, not a place to pre-register hypothetical future events.
+export const AUDIT_ACTIONS = Object.freeze({
+  LOGIN: "LOGIN",
+  LOGOUT: "LOGOUT",
+  PASSWORD_RESET_REQUESTED: "PASSWORD_RESET_REQUESTED",
+  PASSWORD_RESET: "PASSWORD_RESET",
+  CREATE: "CREATE",
+  ACTIVATE: "ACTIVATE",
+  DEACTIVATE: "DEACTIVATE",
+  RESET_PASSWORD: "RESET_PASSWORD",
+  APPROVE: "APPROVE",
+  REJECT: "REJECT",
+  ENDORSE: "ENDORSE",
+  RELEASE: "RELEASE",
+  COMPLETE: "COMPLETE",
+  CLAIM: "CLAIM",
+  CANCEL: "CANCEL",
+  EXPORT: "EXPORT",
+});
+
+export const AUDIT_MODULES = Object.freeze({
+  AUTH: "AUTH",
+  USER_MANAGEMENT: "USER_MANAGEMENT",
+  VERIFICATION: "VERIFICATION",
+  GUARDIAN: "GUARDIAN",
+  PENSION: "PENSION",
+  BENEFITS: "BENEFITS",
+  REPORTS: "REPORTS",
+});
