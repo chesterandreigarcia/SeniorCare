@@ -50,3 +50,14 @@ export class AccountStatusError extends AppError {
     super(message, 403, code);
   }
 }
+
+export class MaintenanceModeError extends AppError {
+  // Thrown by auth.middleware.js when System Settings' maintenanceMode
+  // is ON and the authenticated caller is not an Administrator. 503
+  // (Service Unavailable) — the standard status for "temporarily down
+  // for maintenance," distinct from a 403 (which would imply the user
+  // specifically lacks permission, not that the whole system is paused).
+  constructor(message = "SENIORCARE is currently undergoing maintenance. Please try again later.") {
+    super(message, 503, "MAINTENANCE_MODE");
+  }
+}

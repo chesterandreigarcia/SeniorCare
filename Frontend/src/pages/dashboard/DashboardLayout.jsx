@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Heart, ClipboardCheck, LogOut, Menu, X, ShieldCheck, Building2, Users2, Wallet, HandHeart, Megaphone, Users, MessageSquareWarning, Map, BarChart3, History } from "lucide-react";
+import { Heart, ClipboardCheck, LogOut, Menu, X, ShieldCheck, Building2, Users2, Wallet, HandHeart, Megaphone, Users, MessageSquareWarning, Map, BarChart3, History, Settings } from "lucide-react";
 import { logout as apiLogout, clearSession, getStoredUser } from "../../services/authService.js";
+import { getPublicSettings } from "../../services/systemSettingsService.js";
 import NotificationBell from "../../components/NotificationBell.jsx";
 import { COLORS, FONT_STACK } from "./theme.js";
 
@@ -24,6 +25,17 @@ export default function DashboardLayout({ children, title, subtitle }) {
   const user = getStoredUser();
   const isAdmin = user?.role === "ADMIN";
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // System Settings' general.systemName is genuinely reflected here — not
+  // just on the Settings page itself — via the public branding endpoint
+  // (systemSettings.service.js#getPublicSettings). Falls back to the
+  // static "SENIORCARE" name if the fetch hasn't resolved yet or fails.
+  const [systemName, setSystemName] = useState("SENIORCARE");
+
+  useEffect(() => {
+    getPublicSettings().then((settings) => {
+      if (settings?.systemName) setSystemName(settings.systemName);
+    });
+  }, []);
 
   const dashboardHome =
     user?.role === "ADMIN" ? "/admin/dashboard" : user?.role === "LGU_OSCA" ? "/lgu/dashboard" : "/barangay/dashboard";
@@ -86,6 +98,12 @@ export default function DashboardLayout({ children, title, subtitle }) {
             active: location.pathname.startsWith("/admin/audit-logs"),
           },
           {
+            to: "/admin/settings",
+            icon: Settings,
+            label: "System Settings",
+            active: location.pathname.startsWith("/admin/settings"),
+          },
+          {
             to: "/admin/barangays",
             icon: Building2,
             label: "Barangay Management",
@@ -137,7 +155,7 @@ export default function DashboardLayout({ children, title, subtitle }) {
             <Heart className="w-4 h-4 text-white" aria-hidden="true" />
           </span>
           <span className="font-bold" style={{ color: COLORS.yale }}>
-            SENIORCARE
+            {systemName}
           </span>
         </div>
         <div className="flex items-center">
@@ -174,7 +192,7 @@ export default function DashboardLayout({ children, title, subtitle }) {
                 <Heart className="w-5 h-5 text-white" aria-hidden="true" />
               </span>
               <span className="text-lg font-bold tracking-tight" style={{ color: COLORS.yale }}>
-                SENIORCARE
+                {systemName}
               </span>
             </div>
             <button

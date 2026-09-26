@@ -11,6 +11,7 @@ import { resolveActingSenior } from "../utils/guardianAccess.js";
 import { computeEligibility } from "./benefitProgram.service.js";
 import { createNotification } from "./notification.service.js";
 import { safeCreateAuditLog } from "./auditLog.service.js";
+import { isApplicationSubmissionEnabled } from "./systemSettings.service.js";
 
 function auditApplicationAction(application, requestingUser, action, description, statusTo, extra = {}) {
   return safeCreateAuditLog({
@@ -68,6 +69,14 @@ export async function applyForBenefit(
   documentTypes = [],
   requestedSeniorId
 ) {
+  // System Settings' applications.enabled toggle (module 15) — gates
+  // NEW submissions only; Staff can still review/approve/reject/release
+  // applications already in the pipeline while this is OFF (see this
+  // module's other exports, none of which check this flag).
+  if (!(await isApplicationSubmissionEnabled())) {
+    throw new ValidationError("New benefit/assistance applications are currently disabled by the Administrator.");
+  }
+
   const senior = await resolveActingSenior(requestingUser, requestedSeniorId);
 
   const seniorUser = await User.findById(senior.userId);

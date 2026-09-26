@@ -8,6 +8,7 @@ import Document from "../models/Document.js";
 import { hashPassword, generateTemporaryPassword } from "../utils/password.js";
 import { ROLES, ACCOUNT_STATUS, VERIFICATION_STATUS, MINIMUM_SENIOR_AGE, DOCUMENT_TYPES } from "../utils/constants.js";
 import { ValidationError, ConflictError, NotFoundError } from "../utils/errors.js";
+import { isSeniorRegistrationEnabled, isGuardianRegistrationEnabled } from "./systemSettings.service.js";
 
 function calculateAge(dateOfBirth) {
   const today = new Date();
@@ -29,6 +30,19 @@ function calculateAge(dateOfBirth) {
  * through never leaves an orphaned User with no Senior/Verification record.
  */
 export async function registerSenior(data, uploadedFiles = {}) {
+  // System Settings' registration toggles (module 15). Checked first,
+  // before any other validation/writes, so a disabled registration
+  // never partially processes a submission.
+  if (!(await isSeniorRegistrationEnabled())) {
+    throw new ValidationError("Senior Citizen registration is currently disabled by the Administrator.");
+  }
+  if (data.guardian?.hasGuardian && !(await isGuardianRegistrationEnabled())) {
+    throw new ValidationError(
+      "Guardian/Authorized Representative registration is currently disabled by the Administrator.",
+      { "guardian.hasGuardian": "Guardian registration is temporarily unavailable. You may still register the Senior without a Guardian." }
+    );
+  }
+
   const barangay = await Barangay.findById(data.barangayId);
   if (!barangay || !barangay.isActive) {
     throw new ValidationError("The selected barangay is invalid or currently inactive.", {

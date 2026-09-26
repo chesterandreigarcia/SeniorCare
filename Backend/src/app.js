@@ -23,6 +23,7 @@ import guardianRoutes from "./routes/guardian.routes.js";
 import analyticsRoutes from "./routes/analytics.routes.js";
 import adminReportsRoutes from "./routes/adminReports.routes.js";
 import auditLogRoutes from "./routes/auditLog.routes.js";
+import systemSettingsRoutes from "./routes/systemSettings.routes.js";
 import { notFoundHandler, errorHandler } from "./middleware/error.middleware.js";
 import { getBarangays } from "./controllers/registration.controller.js";
 
@@ -67,6 +68,7 @@ export function createApp() {
   app.use("/api/analytics", analyticsRoutes);
   app.use("/api/admin-reports", adminReportsRoutes);
   app.use("/api/audit-logs", auditLogRoutes);
+  app.use("/api/settings", systemSettingsRoutes);
   // Convenience alias — same handler as GET /api/registration/barangays.
   app.get("/api/barangays", getBarangays);
 

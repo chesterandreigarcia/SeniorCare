@@ -1,5 +1,6 @@
 import Notification from "../models/Notification.js";
 import { NotFoundError } from "../utils/errors.js";
+import { areNotificationsEnabled } from "./systemSettings.service.js";
 
 /**
  * Creates a notification for a single recipient.
@@ -30,6 +31,16 @@ export async function createNotification({
   relatedEntityType = null,
   relatedEntityId = null,
 }) {
+  // System Settings' notifications.enabled toggle (module 15) — while
+  // OFF, no new Notification document is created for ANY event,
+  // system-wide. Existing notifications already delivered are
+  // untouched; this only gates future creation. Checked here, at the
+  // single lowest-level write function, so every caller in the project
+  // (benefitApplication/pensionClaim/verification/announcement
+  // services) is covered without touching each of them individually.
+  if (!(await areNotificationsEnabled())) {
+    return null;
+  }
   try {
     return await Notification.create({
       recipientId,
