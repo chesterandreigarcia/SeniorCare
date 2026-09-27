@@ -65,6 +65,40 @@ export async function getMe() {
   }
 }
 
+/**
+ * POST /api/auth/forgot-password
+ * Backend: auth.routes.js -> auth.controller.js#forgotPassword ->
+ * auth.service.js#requestPasswordReset. Always resolves the same way
+ * whether or not the account exists (no enumeration) in production.
+ *
+ * Outside production, the backend has no email service configured (see
+ * auth.controller.js's own comment) and includes `devOnlyResetToken` /
+ * `devOnlyNote` directly in the response so the flow can be completed
+ * without a real inbox — ForgotPassword.jsx surfaces that clearly to
+ * whoever is testing, rather than silently using it.
+ */
+export async function requestPasswordReset(email) {
+  try {
+    const res = await api.post("/auth/forgot-password", { email });
+    return res.data;
+  } catch (err) {
+    throw toApiError(err);
+  }
+}
+
+/**
+ * POST /api/auth/reset-password
+ * Backend: auth.controller.js#resetPassword -> auth.service.js#resetPassword.
+ */
+export async function resetPassword({ token, newPassword }) {
+  try {
+    const res = await api.post("/auth/reset-password", { token, newPassword });
+    return res.data;
+  } catch (err) {
+    throw toApiError(err);
+  }
+}
+
 // ---- Minimal client-side session storage ----
 // No auth context/store exists yet in this project. Kept intentionally
 // small and swappable: if the project later adds a real AuthContext or

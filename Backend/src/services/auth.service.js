@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import User from "../models/User.js";
 import Senior from "../models/Senior.js";
+import PasswordResetToken from "../models/PasswordResetToken.js";
 import {
   verifyPassword,
   hashPassword,
@@ -16,12 +17,6 @@ import {
   ValidationError,
   NotFoundError,
 } from "../utils/errors.js";
-
-// In-memory placeholder for reset tokens. Replace with a dedicated
-// PasswordResetToken collection (token hash, userId, expiresAt, used)
-// before shipping to production — kept minimal here to stay focused on
-// the core registration/verification/auth architecture.
-const resetTokenStore = new Map();
 
 export async function login({ emailOrUsername, password }, { ipAddress } = {}) {
   const normalized = emailOrUsername.trim().toLowerCase();
@@ -184,20 +179,31 @@ export async function requestPasswordReset(email) {
   const user = await User.findOne({ email: email.trim().toLowerCase() });
 
   // Always behave the same way whether or not the account exists.
-  if (!user) return;
+  if (!user) return null;
 
   const token = crypto.randomBytes(32).toString("hex");
   const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
-  const expiresAt = Date.now() + 30 * 60 * 1000; // 30 minutes, single use
+  const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes, single use
 
-  resetTokenStore.set(tokenHash, {
-    userId: user._id.toString(),
-    expiresAt,
-    used: false,
-  });
+  // Persisted (previously an in-memory Map — see PasswordResetToken.js
+  // for why that was the actual bug). Any previous outstanding token(s)
+  // for this user are invalidated by simply not being looked up again —
+  // resetPassword() always looks up by the specific token hash presented,
+  // so an old token remains unusable once a newer one exists, but we
+  // also proactively remove them so the collection doesn't accumulate
+  // dead rows between requests.
+  await PasswordResetToken.deleteMany({ userId: user._id, used: false });
+  await PasswordResetToken.create({ userId: user._id, tokenHash, expiresAt });
 
-  // In production, email `token` to the user via a transactional email
-  // service. Never log or return the raw token to the API caller.
+  // In production, email `token` (as a link to the frontend's reset
+  // page, e.g. `${CLIENT_URL}/reset-password?token=...`) to the user via
+  // a transactional email service. No such service is configured
+  // anywhere in this project (checked package.json and .env.example —
+  // no nodemailer/SMTP/SendGrid setup exists), so this project cannot
+  // actually deliver that email yet. Never log or fake that delivery
+  // succeeded. The token is returned here so the caller (see
+  // auth.controller.js#forgotPassword) can decide, based on environment,
+  // whether it's safe to surface it directly for local testing.
   return token;
 }
 
@@ -213,9 +219,9 @@ export async function resetPassword({ token, newPassword }) {
   }
 
   const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
-  const record = resetTokenStore.get(tokenHash);
+  const record = await PasswordResetToken.findOne({ tokenHash });
 
-  if (!record || record.used || record.expiresAt < Date.now()) {
+  if (!record || record.used || record.expiresAt.getTime() < Date.now()) {
     throw new AuthenticationError(
       "This password reset link is invalid or has expired.",
     );
@@ -232,6 +238,7 @@ export async function resetPassword({ token, newPassword }) {
   await user.save();
 
   record.used = true;
+  await record.save();
 
   await safeCreateAuditLog({
     actor: { id: user._id.toString(), role: user.role },

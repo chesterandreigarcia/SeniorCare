@@ -7,13 +7,20 @@ import { SEX, CIVIL_STATUS } from "../utils/constants.js";
 
 const addressSchema = new mongoose.Schema(
   {
-    houseLotBlock: { type: String, trim: true, default: "" },
+    // Previously `default: ""` with no `required` — meaning a Senior
+    // record could be saved with a blank House/Lot/Block, Province, or
+    // Postal Code even if the Zod validator were ever bypassed
+    // (registration.validator.js). Backend validation is the primary
+    // guard, but the schema itself should not silently accept blanks
+    // either — defense in depth, same principle as the unique index on
+    // seniorCitizenId below.
+    houseLotBlock: { type: String, trim: true, required: true },
     street: { type: String, trim: true, required: true },
     sitio: { type: String, trim: true, default: "" },
     purok: { type: String, trim: true, default: "" },
     municipality: { type: String, trim: true, required: true },
-    province: { type: String, trim: true, default: "" },
-    postalCode: { type: String, trim: true, default: "" },
+    province: { type: String, trim: true, required: true },
+    postalCode: { type: String, trim: true, required: true },
   },
   { _id: false }
 );
@@ -24,7 +31,6 @@ const seniorSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
-      unique: true,
     },
     barangayId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -42,12 +48,16 @@ const seniorSchema = new mongoose.Schema(
     sex: { type: String, enum: Object.values(SEX), required: true },
     civilStatus: { type: String, enum: Object.values(CIVIL_STATUS), required: true },
 
-    // Optional — a senior may not yet hold a physical ID at registration time.
+    // Optional — a senior may not yet hold a physical ID at registration
+    // time. Uniqueness is enforced by the sparse unique index below, not
+    // by `unique: true` here — declaring both is a duplicate-index
+    // definition (Mongoose logs a warning and, depending on version, can
+    // create two overlapping indexes for the same effective constraint).
+    // This was flagged in this project's own "previous bugs to avoid"
+    // list; consolidated to the single explicit index only.
     seniorCitizenId: {
       type: String,
       trim: true,
-      unique: true,
-      sparse: true,
     },
 
     mobileNumber: { type: String, required: true, trim: true },

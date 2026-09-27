@@ -4,6 +4,7 @@ import { Heart, ClipboardCheck, LogOut, Menu, X, ShieldCheck, Building2, Users2,
 import { logout as apiLogout, clearSession, getStoredUser } from "../../services/authService.js";
 import { getPublicSettings } from "../../services/systemSettingsService.js";
 import NotificationBell from "../../components/NotificationBell.jsx";
+import LogoutConfirmDialog from "../../components/LogoutConfirmDialog.jsx";
 import { COLORS, FONT_STACK } from "./theme.js";
 
 const ROLE_LABELS = {
@@ -119,7 +120,11 @@ export default function DashboardLayout({ children, title, subtitle }) {
       : []),
   ];
 
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
   const handleLogout = async () => {
+    setLoggingOut(true);
     try {
       await apiLogout();
     } catch {
@@ -252,7 +257,7 @@ export default function DashboardLayout({ children, title, subtitle }) {
             </div>
             <button
               type="button"
-              onClick={handleLogout}
+              onClick={() => setShowLogoutConfirm(true)}
               className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-md text-[15px] font-semibold border hover:bg-slate-50 transition-colors"
               style={{ color: COLORS.yale, borderColor: COLORS.alabaster }}
             >
@@ -261,6 +266,15 @@ export default function DashboardLayout({ children, title, subtitle }) {
             </button>
           </div>
         </aside>
+
+        {showLogoutConfirm && (
+          <LogoutConfirmDialog
+            colors={COLORS}
+            loading={loggingOut}
+            onCancel={() => setShowLogoutConfirm(false)}
+            onConfirm={handleLogout}
+          />
+        )}
 
         {/* Main content */}
         <main className="flex-1 min-w-0 px-4 sm:px-6 lg:px-8 py-6 lg:py-8">

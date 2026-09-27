@@ -57,6 +57,36 @@ const STEPS = [
 // isn't surprised by a 400 at the very end of the wizard.
 const EMAIL_FORMAT_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// Philippine mobile number — mirrors the backend's phMobileRegex
+// (registration.validator.js). Used for both the Senior's own mobile
+// and the Guardian's, which previously had no format check at all here
+// or on the backend.
+const PH_MOBILE_RE = /^(\+?63|0)?9\d{9}$/;
+
+// Mirrors backend/src/utils/textValidation.js's isValidPersonName /
+// isValidAddressLine — reasonable, not-overly-strict sanity checks so
+// the user sees the same "please enter a valid X" feedback here that
+// the backend would otherwise only reveal after a round trip. The
+// backend remains the authoritative check either way.
+const JUNK_VALUES = new Set(["test", "n/a", "na", "none", "asdf", "asd", "xxx", "...", "???", "!!!", "-", "--"]);
+
+function isValidPersonName(value) {
+  const trimmed = (value || "").trim();
+  if (trimmed.length < 2) return false;
+  if (JUNK_VALUES.has(trimmed.toLowerCase())) return false;
+  if (!/^[\p{L}\p{M}][\p{L}\p{M}\s'.-]*$/u.test(trimmed)) return false;
+  const letterCount = (trimmed.match(/\p{L}/gu) || []).length;
+  return letterCount >= 2;
+}
+
+function isValidAddressLine(value) {
+  const trimmed = (value || "").trim();
+  if (trimmed.length < 2) return false;
+  if (JUNK_VALUES.has(trimmed.toLowerCase())) return false;
+  const alnumCount = (trimmed.match(/[\p{L}\p{N}]/gu) || []).length;
+  return alnumCount >= 2;
+}
+
 // ---------- shared field components ----------
 
 function FieldLabel({ children, required, htmlFor }) {
@@ -480,8 +510,11 @@ function StepHeading({ title, helper }) {
 // fields the frontend's own validation would.
 const BACKEND_TO_LOCAL_ERROR_KEY = {
   barangayId: "barangay",
+  "address.houseLotBlock": "houseNo",
   "address.street": "street",
   "address.municipality": "municipality",
+  "address.province": "province",
+  "address.postalCode": "postalCode",
   accountEmail: "accountEmail",
   mobileNumber: "mobile",
   seniorCitizenId: "seniorId",
@@ -610,9 +643,10 @@ export default function SeniorCareRegisterPage() {
         newErrors.barangay = "Please select your barangay to continue.";
     }
     if (key === "personal") {
-      if (!form.firstName)
-        newErrors.firstName = "Please enter your first name.";
+      if (!form.firstName) newErrors.firstName = "Please enter your first name.";
+      else if (!isValidPersonName(form.firstName)) newErrors.firstName = "Please enter a valid first name.";
       if (!form.lastName) newErrors.lastName = "Please enter your last name.";
+      else if (!isValidPersonName(form.lastName)) newErrors.lastName = "Please enter a valid last name.";
       if (!form.dob) newErrors.dob = "Please enter your date of birth.";
       if (!form.sex) newErrors.sex = "Please select your sex.";
       if (!form.civilStatus)
@@ -620,13 +654,21 @@ export default function SeniorCareRegisterPage() {
     }
     if (key === "contact") {
       if (!form.mobile) newErrors.mobile = "Please enter a mobile number.";
-      else if (!/^\d{10}$/.test(form.mobile.replace(/\D/g, "").slice(-10))) {
-        newErrors.mobile = "Please enter a valid 10-digit mobile number.";
+      else if (!PH_MOBILE_RE.test(form.mobile.replace(/[\s-]/g, ""))) {
+        newErrors.mobile = "Please enter a valid Philippine mobile number.";
       }
+      if (!form.houseNo) newErrors.houseNo = "Please enter your house/lot/block.";
+      else if (!isValidAddressLine(form.houseNo)) newErrors.houseNo = "Please enter a valid house/lot/block.";
       if (!form.street)
         newErrors.street = "Please enter your street, sitio, or purok.";
+      else if (!isValidAddressLine(form.street)) newErrors.street = "Please enter a valid street, sitio, or purok.";
       if (!form.municipality)
         newErrors.municipality = "Please enter your municipality or city.";
+      else if (!isValidAddressLine(form.municipality)) newErrors.municipality = "Please enter a valid municipality or city.";
+      if (!form.province) newErrors.province = "Please enter your province.";
+      else if (!isValidAddressLine(form.province)) newErrors.province = "Please enter a valid province.";
+      if (!form.postalCode) newErrors.postalCode = "Please enter your postal code.";
+      else if (!/^\d{4}$/.test(form.postalCode.trim())) newErrors.postalCode = "Postal code must be exactly 4 digits.";
     }
     if (key === "status") {
       if (!form.bedridden)
@@ -636,13 +678,19 @@ export default function SeniorCareRegisterPage() {
       if (!form.guardianFirstName)
         newErrors.guardianFirstName =
           "Please enter the representative's first name.";
+      else if (!isValidPersonName(form.guardianFirstName))
+        newErrors.guardianFirstName = "Please enter a valid first name.";
       if (!form.guardianLastName)
         newErrors.guardianLastName =
           "Please enter the representative's last name.";
+      else if (!isValidPersonName(form.guardianLastName))
+        newErrors.guardianLastName = "Please enter a valid last name.";
       if (!form.guardianRelationship)
         newErrors.guardianRelationship = "Please select a relationship.";
       if (!form.guardianMobile)
         newErrors.guardianMobile = "Please enter a mobile number.";
+      else if (!PH_MOBILE_RE.test(form.guardianMobile.replace(/[\s-]/g, "")))
+        newErrors.guardianMobile = "Please enter a valid Philippine mobile number.";
       if (!form.guardianEmail)
         newErrors.guardianEmail =
           "Please enter an email address — this becomes the representative's login for their Guardian account.";
@@ -1312,8 +1360,13 @@ function ContactStep({ form, set, errors, clearError }) {
         <TextField
           id="houseNo"
           label="House / Lot / Block"
+          required
           value={form.houseNo}
-          onChange={(e) => set("houseNo", e.target.value)}
+          onChange={(e) => {
+            set("houseNo", e.target.value);
+            clearError("houseNo");
+          }}
+          error={errors.houseNo}
         />
         <TextField
           id="street"
@@ -1342,14 +1395,24 @@ function ContactStep({ form, set, errors, clearError }) {
         <TextField
           id="province"
           label="Province"
+          required
           value={form.province}
-          onChange={(e) => set("province", e.target.value)}
+          onChange={(e) => {
+            set("province", e.target.value);
+            clearError("province");
+          }}
+          error={errors.province}
         />
         <TextField
           id="postalCode"
           label="Postal Code"
+          required
           value={form.postalCode}
-          onChange={(e) => set("postalCode", e.target.value)}
+          onChange={(e) => {
+            set("postalCode", e.target.value.replace(/\D/g, "").slice(0, 4));
+            clearError("postalCode");
+          }}
+          error={errors.postalCode}
         />
       </div>
     </div>

@@ -19,7 +19,15 @@ export function errorHandler(err, req, res, _next) {
     statusCode = 409;
     code = "CONFLICT";
     const field = Object.keys(err.keyPattern || {})[0] || "field";
-    message = `A record with this ${field} already exists.`;
+    // Friendlier, field-specific wording for the cases users actually
+    // hit (raw Mongo errors must never reach the client) — falls back to
+    // the generic phrasing for any other unique field.
+    const FRIENDLY_DUPLICATE_MESSAGES = {
+      seniorCitizenId: "This Senior Citizen ID is already registered.",
+      email: "An account with this email already exists.",
+      accountEmail: "An account with this email already exists.",
+    };
+    message = FRIENDLY_DUPLICATE_MESSAGES[field] || `A record with this ${field} already exists.`;
     errors = undefined;
   }
 

@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
+import ForgotPassword from "./pages/ForgotPassword.jsx";
+import ResetPassword from "./pages/ResetPassword.jsx";
 import Register from "./pages/Register";
 import VerificationDashboard from "./pages/dashboard/VerificationDashboard.jsx";
 import SeniorReviewPage from "./pages/dashboard/SeniorReviewPage.jsx";
@@ -37,6 +39,10 @@ function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
+        {/* Phase 1 fix: these were previously dead links (Login.jsx has
+            always pointed to /forgot-password, but neither route existed). */}
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/register" element={<Register />} />
 
         {/* Senior Citizen's own service dashboard. */}

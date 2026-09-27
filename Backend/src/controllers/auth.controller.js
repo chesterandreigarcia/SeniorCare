@@ -88,12 +88,25 @@ export async function me(req, res, next) {
 
 export async function forgotPassword(req, res, next) {
   try {
-    await authService.requestPasswordReset(req.validatedBody.email);
-    // Always the same response, whether or not the account exists.
-    res.status(200).json({
+    const token = await authService.requestPasswordReset(req.validatedBody.email);
+    const response = {
       success: true,
       message: "If an account exists for this email, password recovery instructions have been sent.",
-    });
+    };
+    // No email-delivery service is configured anywhere in this project
+    // (no nodemailer/SMTP/SendGrid setup exists in package.json or
+    // .env.example) — so outside production, the token is returned
+    // directly in this response so the reset flow can actually be used
+    // and tested end-to-end. This is intentionally gated off in
+    // production rather than silently faking that an email was sent;
+    // wiring a real transactional email service is a deployment/
+    // environment-configuration task, not something this phase invents.
+    if (process.env.NODE_ENV !== "production" && token) {
+      response.devOnlyResetToken = token;
+      response.devOnlyNote =
+        "No email service is configured in this environment. This token is only included because NODE_ENV is not 'production'.";
+    }
+    res.status(200).json(response);
   } catch (err) {
     next(err);
   }

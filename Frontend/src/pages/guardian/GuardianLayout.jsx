@@ -16,6 +16,7 @@ import {
 import { logout as apiLogout, clearSession, getStoredUser } from "../../services/authService.js";
 import { getManagedSeniors, getSelectedSeniorId, setSelectedSeniorId } from "../../services/guardianService.js";
 import NotificationBell from "../../components/NotificationBell.jsx";
+import LogoutConfirmDialog from "../../components/LogoutConfirmDialog.jsx";
 import { COLORS, FONT_STACK } from "../dashboard/theme.js";
 
 const NAV_ITEMS = [
@@ -43,6 +44,8 @@ export default function GuardianLayout({ children, title, subtitle }) {
   const [seniors, setSeniors] = useState([]);
   const [selectedId, setSelectedIdState] = useState(getSelectedSeniorId());
   const [switcherOpen, setSwitcherOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   useEffect(() => {
     getManagedSeniors()
@@ -72,6 +75,7 @@ export default function GuardianLayout({ children, title, subtitle }) {
   };
 
   const handleLogout = async () => {
+    setLoggingOut(true);
     try {
       await apiLogout();
     } finally {
@@ -145,7 +149,7 @@ export default function GuardianLayout({ children, title, subtitle }) {
           <div className="absolute bottom-0 left-0 right-0 px-3 py-4 border-t-2" style={{ borderColor: COLORS.alabaster }}>
             <button
               type="button"
-              onClick={handleLogout}
+              onClick={() => setShowLogoutConfirm(true)}
               className="flex items-center gap-3 px-3 py-2.5 rounded-lg font-semibold text-sm w-full"
               style={{ color: "#b8452f" }}
             >
@@ -154,6 +158,15 @@ export default function GuardianLayout({ children, title, subtitle }) {
             </button>
           </div>
         </aside>
+
+        {showLogoutConfirm && (
+          <LogoutConfirmDialog
+            colors={COLORS}
+            loading={loggingOut}
+            onCancel={() => setShowLogoutConfirm(false)}
+            onConfirm={handleLogout}
+          />
+        )}
 
         {sidebarOpen && (
           <div className="fixed inset-0 bg-black/40 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} aria-hidden="true" />

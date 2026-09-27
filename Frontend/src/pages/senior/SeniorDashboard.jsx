@@ -34,6 +34,7 @@ import NotificationsPanel from "./NotificationsPanel.jsx";
 import ActivitiesPanel from "./ActivitiesPanel.jsx";
 import ConcernsPanel from "./ConcernsPanel.jsx";
 import NotificationBell from "../../components/NotificationBell.jsx";
+import LogoutConfirmDialog from "../../components/LogoutConfirmDialog.jsx";
 import { getStoredUser, logout, clearSession } from "../../services/authService.js";
 
 /**
@@ -231,6 +232,8 @@ export default function SeniorDashboard() {
   const [error, setError] = useState(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [a11y, setA11y] = useState(loadA11yPrefs);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const t = TEXT_SCALES[a11y.textScale];
 
@@ -252,6 +255,7 @@ export default function SeniorDashboard() {
   }, [loadProfile]);
 
   const handleLogout = useCallback(async () => {
+    setLoggingOut(true);
     try {
       await logout();
     } catch {
@@ -317,7 +321,7 @@ export default function SeniorDashboard() {
             <NotificationBell colors={COLORS} />
             <button
               type="button"
-              onClick={handleLogout}
+              onClick={() => setShowLogoutConfirm(true)}
               className="hidden sm:flex items-center gap-2 rounded-md px-3 py-2.5 font-bold text-white hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
             >
               <LogOut className="w-5 h-5" aria-hidden="true" />
@@ -350,7 +354,7 @@ export default function SeniorDashboard() {
             ))}
             <button
               type="button"
-              onClick={handleLogout}
+              onClick={() => setShowLogoutConfirm(true)}
               className={`${t.body} text-left font-bold text-white flex items-center gap-2 rounded-md px-3 py-3 hover:bg-white/10`}
             >
               <LogOut className="w-5 h-5" aria-hidden="true" /> Logout
@@ -641,6 +645,15 @@ export default function SeniorDashboard() {
           </>
         )}
       </main>
+
+      {showLogoutConfirm && (
+        <LogoutConfirmDialog
+          colors={COLORS}
+          loading={loggingOut}
+          onCancel={() => setShowLogoutConfirm(false)}
+          onConfirm={handleLogout}
+        />
+      )}
     </div>
   );
 }
