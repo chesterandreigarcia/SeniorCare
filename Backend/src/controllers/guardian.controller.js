@@ -26,3 +26,21 @@ export async function getSenior(req, res, next) {
     next(err);
   }
 }
+
+export async function getMyProfile(req, res, next) {
+  try {
+    const data = await guardianService.getMyGuardianProfile(req.user);
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function updateMyProfile(req, res, next) {
+  try {
+    const data = await guardianService.updateMyGuardianProfile(req.user, req.validatedBody);
+    res.status(200).json({ success: true, message: "Profile updated successfully.", data });
+  } catch (err) {
+    next(err);
+  }
+}

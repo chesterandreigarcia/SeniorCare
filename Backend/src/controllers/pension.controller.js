@@ -21,8 +21,8 @@ export async function listPensions(req, res, next) {
 
 export async function listEligibleSeniors(req, res, next) {
   try {
-    const { search } = req.query;
-    const seniors = await pensionService.listEligibleSeniors(req.user, { search });
+    const { search, barangayId } = req.query;
+    const seniors = await pensionService.listEligibleSeniors(req.user, { search, barangayId });
     res.status(200).json({ success: true, data: seniors });
   } catch (err) {
     next(err);

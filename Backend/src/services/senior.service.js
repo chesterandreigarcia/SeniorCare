@@ -1,7 +1,9 @@
 import Senior from "../models/Senior.js";
 import User from "../models/User.js";
 import Guardian from "../models/Guardian.js";
-import { NotFoundError } from "../utils/errors.js";
+import { NotFoundError, ConflictError } from "../utils/errors.js";
+import { AUDIT_ACTIONS, AUDIT_MODULES } from "../utils/constants.js";
+import { safeCreateAuditLog } from "./auditLog.service.js";
 
 /**
  * Returns the authenticated Senior Citizen's own profile — never anyone
@@ -65,4 +67,107 @@ export async function getMySeniorProfile(userId) {
       : null,
     guardian,
   };
+}
+
+
+// Fields a Senior may correct on their own profile. Everything else
+// (seniorCitizenId, dateOfBirth, sex, civilStatus, barangayId, guardianId,
+// userId, and the account's role/status/verification state) is
+// deliberately absent — dateOfBirth in particular drives age-based
+// benefit eligibility, so a self-service edit could otherwise be used to
+// manufacture eligibility without going through verification.
+const SELF_EDITABLE_FIELDS = ["firstName", "middleName", "lastName", "suffix", "mobileNumber", "bedridden"];
+const ADDRESS_FIELDS = ["houseLotBlock", "street", "sitio", "purok", "municipality", "province", "postalCode"];
+
+function applyProfileFields(senior, data) {
+  const changed = [];
+  for (const key of SELF_EDITABLE_FIELDS) {
+    if (data[key] !== undefined && data[key] !== senior[key]) {
+      senior[key] = data[key];
+      changed.push(key);
+    }
+  }
+  if (data.address) {
+    for (const key of ADDRESS_FIELDS) {
+      if (data.address[key] !== undefined && data.address[key] !== senior.address?.[key]) {
+        senior.address[key] = data.address[key];
+        changed.push(`address.${key}`);
+      }
+    }
+  }
+  return changed;
+}
+
+/**
+ * Self-service profile correction. `userId` always comes from the
+ * authenticated token — a Senior can never edit anyone else's record —
+ * and `data` has already been parsed by updateSeniorProfileSchema, which
+ * has no role/status/barangay/verification/ID fields to write.
+ */
+export async function updateMySeniorProfile(requestingUser, data) {
+  const senior = await Senior.findOne({ userId: requestingUser.id });
+  if (!senior) throw new NotFoundError("Senior profile not found.");
+
+  const changed = applyProfileFields(senior, data);
+  if (changed.length > 0) {
+    await senior.save();
+    await safeCreateAuditLog({
+      actor: requestingUser,
+      action: AUDIT_ACTIONS.UPDATE,
+      module: AUDIT_MODULES.USER_MANAGEMENT,
+      entityType: "Senior",
+      entityId: senior._id,
+      description: `${requestingUser.role} updated their own profile.`,
+      // Field names only — never the personal values themselves.
+      metadata: { changedFields: changed },
+      barangayId: senior.barangayId,
+    });
+  }
+  return getMySeniorProfile(requestingUser.id);
+}
+
+/**
+ * Admin correction of another Senior's profile. Same fields as the
+ * self-service edit, plus seniorCitizenId — protected against
+ * duplicates exactly like registration is (Phase 1), and audited with
+ * the previous/new value since it is an identity field.
+ */
+export async function adminUpdateSeniorProfile(seniorId, data, requestingUser) {
+  const senior = await Senior.findById(seniorId);
+  if (!senior) throw new NotFoundError("Senior profile not found.");
+
+  const changed = applyProfileFields(senior, data);
+
+  let idChange = null;
+  const newId = (data.seniorCitizenId || "").trim();
+  if (data.seniorCitizenId !== undefined && newId !== (senior.seniorCitizenId || "")) {
+    if (newId) {
+      const clash = await Senior.findOne({ seniorCitizenId: newId, _id: { $ne: senior._id } });
+      if (clash) {
+        throw new ConflictError("This Senior Citizen ID is already registered.", {
+          seniorCitizenId: "This ID is already associated with another account.",
+        });
+      }
+    }
+    idChange = { from: senior.seniorCitizenId || null, to: newId || null };
+    senior.seniorCitizenId = newId || undefined;
+    changed.push("seniorCitizenId");
+  }
+
+  if (changed.length === 0) return senior;
+  await senior.save();
+
+  await safeCreateAuditLog({
+    actor: requestingUser,
+    action: AUDIT_ACTIONS.UPDATE,
+    module: AUDIT_MODULES.USER_MANAGEMENT,
+    entityType: "Senior",
+    entityId: senior._id,
+    description: idChange
+      ? `${requestingUser.role} corrected a Senior's profile, including their Senior Citizen ID (sensitive change).`
+      : `${requestingUser.role} corrected a Senior's profile.`,
+    metadata: { changedFields: changed, ...(idChange ? { seniorCitizenIdChange: idChange } : {}) },
+    barangayId: senior.barangayId,
+  });
+  return senior;
 }

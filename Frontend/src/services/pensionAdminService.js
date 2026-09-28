@@ -19,9 +19,9 @@ export async function listPensions({ search, pensionType, status } = {}) {
   }
 }
 
-export async function listEligibleSeniors(search) {
+export async function listEligibleSeniors(search, barangayId) {
   try {
-    const res = await api.get("/pensions/eligible-seniors", { params: { search } });
+    const res = await api.get("/pensions/eligible-seniors", { params: { search, barangayId } });
     return res.data?.data || [];
   } catch (err) {
     throw toApiError(err);

@@ -20,3 +20,19 @@ export async function getMyProfile() {
     throw toApiError(err);
   }
 }
+
+/**
+ * PATCH /api/seniors/me
+ * Non-sensitive corrections only (name, mobile, address, bedridden).
+ * The backend's strict schema has no field for Senior Citizen ID, date
+ * of birth, barangay, role, or status, so nothing sent here can change
+ * them. Returns the refreshed profile (same shape as getMyProfile).
+ */
+export async function updateMyProfile(payload) {
+  try {
+    const res = await api.patch("/seniors/me", payload);
+    return res.data.data;
+  } catch (err) {
+    throw toApiError(err);
+  }
+}

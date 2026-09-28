@@ -17,6 +17,7 @@ import SeniorAnalyticsPage from "./pages/dashboard/SeniorAnalyticsPage.jsx";
 import AdminReportsPage from "./pages/dashboard/AdminReportsPage.jsx";
 import AuditLogsPage from "./pages/dashboard/AuditLogsPage.jsx";
 import SystemSettingsPage from "./pages/dashboard/SystemSettingsPage.jsx";
+import UserManagementPage from "./pages/dashboard/UserManagementPage.jsx";
 import SeniorDashboard from "./pages/senior/SeniorDashboard.jsx";
 import GuardianDashboard from "./pages/guardian/GuardianDashboard.jsx";
 import GuardianSeniorsPage from "./pages/guardian/GuardianSeniorsPage.jsx";
@@ -224,6 +225,14 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={["ADMIN"]}>
               <AuditLogsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/users"
+          element={
+            <ProtectedRoute allowedRoles={["ADMIN"]}>
+              <UserManagementPage />
             </ProtectedRoute>
           }
         />

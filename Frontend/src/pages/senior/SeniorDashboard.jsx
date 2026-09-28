@@ -25,7 +25,7 @@ import {
   RefreshCw,
   MessageSquareWarning,
 } from "lucide-react";
-import { getMyProfile } from "../../services/seniorService.js";
+import { getMyProfile, updateMyProfile } from "../../services/seniorService.js";
 import PensionPanel from "./PensionPanel.jsx";
 import BenefitsPanel from "./BenefitsPanel.jsx";
 import ApplicationsPanel from "./ApplicationsPanel.jsx";
@@ -35,6 +35,7 @@ import ActivitiesPanel from "./ActivitiesPanel.jsx";
 import ConcernsPanel from "./ConcernsPanel.jsx";
 import NotificationBell from "../../components/NotificationBell.jsx";
 import LogoutConfirmDialog from "../../components/LogoutConfirmDialog.jsx";
+import { SeniorEditProfileDialog } from "../../components/EditProfileDialogs.jsx";
 import { getStoredUser, logout, clearSession } from "../../services/authService.js";
 
 /**
@@ -234,6 +235,7 @@ export default function SeniorDashboard() {
   const [a11y, setA11y] = useState(loadA11yPrefs);
   const [loggingOut, setLoggingOut] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showEditProfile, setShowEditProfile] = useState(false);
 
   const t = TEXT_SCALES[a11y.textScale];
 
@@ -615,9 +617,20 @@ export default function SeniorDashboard() {
                     />
                     <ProfileField t={t} label="Barangay" value={profile.barangay ? `Barangay ${profile.barangay.name}` : "—"} />
                   </dl>
-                  <p className={`${t.small} text-slate-500 mt-5`}>
-                    This information was verified by your barangay. To request a correction, please contact your barangay office.
-                  </p>
+                  <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+                    <p className={`${t.small} text-slate-500`}>
+                      You can correct your name, contact number, and address. Your Senior Citizen ID, birth date, and
+                      barangay were verified by your barangay — contact your barangay office to change those.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setShowEditProfile(true)}
+                      className="px-4 py-2 rounded-md text-sm font-bold text-white"
+                      style={{ backgroundColor: COLORS.baltic }}
+                    >
+                      Edit Profile
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <EmptyState icon={UserCircle} title="Profile not available." message="Please try again later." t={t} />
@@ -645,6 +658,19 @@ export default function SeniorDashboard() {
           </>
         )}
       </main>
+
+      {showEditProfile && profile && (
+        <SeniorEditProfileDialog
+          initial={profile}
+          submit={updateMyProfile}
+          colors={COLORS}
+          onClose={() => setShowEditProfile(false)}
+          onSaved={(updated) => {
+            setProfile(updated);
+            setShowEditProfile(false);
+          }}
+        />
+      )}
 
       {showLogoutConfirm && (
         <LogoutConfirmDialog

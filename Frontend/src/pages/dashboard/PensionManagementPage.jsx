@@ -69,9 +69,14 @@ function formatDate(value) {
 // ---------------- Pension Records tab ----------------
 
 function CreatePensionDialog({ onClose, onCreated }) {
+  const currentUser = getStoredUser();
+  const canChooseBarangay = ROLES_WITH_BARANGAY_CHOICE.has(currentUser?.role);
+
   const [search, setSearch] = useState("");
+  const [barangayId, setBarangayId] = useState("");
+  const [barangayOptions, setBarangayOptions] = useState([]);
   const [seniors, setSeniors] = useState([]);
-  const [loadingSeniors, setLoadingSeniors] = useState(true);
+  const [loadingSeniors, setLoadingSeniors] = useState(false);
   const [form, setForm] = useState({
     seniorId: "",
     pensionType: "SOCIAL_PENSION",
@@ -84,10 +89,33 @@ function CreatePensionDialog({ onClose, onCreated }) {
   const [error, setError] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
 
+  // Same reusable barangay-picker pattern CreateScheduleDialog above
+  // already uses — Admin/LGU-OSCA have no assigned barangay of their
+  // own, so this is how they scope (or search across all barangays by
+  // typing a name/ID instead — see the search effect below).
+  useEffect(() => {
+    if (!canChooseBarangay) return;
+    listSchedulingBarangays().then(setBarangayOptions);
+  }, [canChooseBarangay]);
+
   useEffect(() => {
     let cancelled = false;
+    // Bug fix (Phase 2): previously this always searched, even with an
+    // empty term and no barangay picked — which is exactly the request
+    // that used to come back empty for every Admin/LGU-OSCA caller (see
+    // pension.service.js#listEligibleSeniors). Now: Staff searches
+    // immediately (they're always scoped to their own barangay
+    // server-side); Admin/LGU-OSCA only searches once they've either
+    // picked a barangay or typed something, and shows a hint instead of
+    // silently loading an empty list before that.
+    const canSearch = !canChooseBarangay || barangayId || search.trim();
+    if (!canSearch) {
+      setSeniors([]);
+      setLoadingSeniors(false);
+      return undefined;
+    }
     setLoadingSeniors(true);
-    listEligibleSeniors(search)
+    listEligibleSeniors(search, canChooseBarangay ? barangayId : undefined)
       .then((data) => {
         if (!cancelled) setSeniors(data);
       })
@@ -97,7 +125,7 @@ function CreatePensionDialog({ onClose, onCreated }) {
     return () => {
       cancelled = true;
     };
-  }, [search]);
+  }, [search, barangayId, canChooseBarangay]);
 
   const update = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
@@ -117,6 +145,11 @@ function CreatePensionDialog({ onClose, onCreated }) {
     }
   };
 
+  const seniorSearchHint =
+    canChooseBarangay && !barangayId && !search.trim()
+      ? "Select a Barangay or type a name/Senior Citizen ID to search."
+      : null;
+
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
       <div className="absolute inset-0 bg-black/40" onClick={submitting ? undefined : onClose} aria-hidden="true" />
@@ -135,6 +168,21 @@ function CreatePensionDialog({ onClose, onCreated }) {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-semibold mb-1.5" style={{ color: COLORS.yale }}>Senior Citizen</label>
+            {canChooseBarangay && (
+              <select
+                value={barangayId}
+                onChange={(e) => setBarangayId(e.target.value)}
+                className="w-full rounded-md border px-3.5 py-2.5 text-sm mb-2 focus:outline-none"
+                style={{ borderColor: COLORS.alabaster }}
+              >
+                <option value="">All Barangays (search by name or ID)</option>
+                {barangayOptions.map((b) => (
+                  <option key={b._id} value={b._id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+            )}
             <div className="relative mb-2">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
@@ -149,13 +197,25 @@ function CreatePensionDialog({ onClose, onCreated }) {
               required
               value={form.seniorId}
               onChange={update("seniorId")}
-              className="w-full rounded-md border px-3.5 py-2.5 text-[15px] focus:outline-none"
+              disabled={Boolean(seniorSearchHint)}
+              className="w-full rounded-md border px-3.5 py-2.5 text-[15px] focus:outline-none disabled:bg-slate-50 disabled:text-slate-400"
               style={{ borderColor: fieldErrors.seniorId ? "#b8452f" : COLORS.alabaster }}
             >
-              <option value="">{loadingSeniors ? "Loading..." : "Select a Senior Citizen"}</option>
+              <option value="">
+                {seniorSearchHint
+                  ? seniorSearchHint
+                  : loadingSeniors
+                  ? "Searching..."
+                  : seniors.length === 0
+                  ? "No matching Seniors found"
+                  : "Select a Senior Citizen"}
+              </option>
               {seniors.map((s) => (
                 <option key={s._id} value={s._id}>
-                  {s.lastName}, {s.firstName} {s.seniorCitizenId ? `(${s.seniorCitizenId})` : ""}
+                  {s.lastName}, {s.firstName}
+                  {s.seniorCitizenId ? ` (${s.seniorCitizenId})` : ""}
+                  {s.age != null ? ` — ${s.age}y/o` : ""}
+                  {s.barangayId?.name ? ` — ${s.barangayId.name}` : ""}
                 </option>
               ))}
             </select>

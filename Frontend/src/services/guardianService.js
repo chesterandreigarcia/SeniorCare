@@ -52,3 +52,27 @@ export function setSelectedSeniorId(seniorId) {
   if (seniorId) localStorage.setItem(SELECTED_SENIOR_KEY, seniorId);
   else localStorage.removeItem(SELECTED_SENIOR_KEY);
 }
+
+/** GET /api/guardian/me — the Guardian's own contact details. */
+export async function getMyGuardianProfile() {
+  try {
+    const res = await api.get("/guardian/me");
+    return res.data?.data;
+  } catch (err) {
+    throw toApiError(err);
+  }
+}
+
+/**
+ * PATCH /api/guardian/me — name/mobile/address only. Relationship, ID,
+ * login email, and which Seniors this Guardian is authorized for can't
+ * be changed from here (the backend schema has no such fields).
+ */
+export async function updateMyGuardianProfile(payload) {
+  try {
+    const res = await api.patch("/guardian/me", payload);
+    return res.data?.data;
+  } catch (err) {
+    throw toApiError(err);
+  }
+}

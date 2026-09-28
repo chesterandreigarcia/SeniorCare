@@ -12,11 +12,13 @@ import {
   Menu,
   X,
   ChevronDown,
+  UserCircle,
 } from "lucide-react";
 import { logout as apiLogout, clearSession, getStoredUser } from "../../services/authService.js";
-import { getManagedSeniors, getSelectedSeniorId, setSelectedSeniorId } from "../../services/guardianService.js";
+import { getManagedSeniors, getSelectedSeniorId, setSelectedSeniorId, getMyGuardianProfile, updateMyGuardianProfile } from "../../services/guardianService.js";
 import NotificationBell from "../../components/NotificationBell.jsx";
 import LogoutConfirmDialog from "../../components/LogoutConfirmDialog.jsx";
+import { GuardianEditProfileDialog } from "../../components/EditProfileDialogs.jsx";
 import { COLORS, FONT_STACK } from "../dashboard/theme.js";
 
 const NAV_ITEMS = [
@@ -46,6 +48,7 @@ export default function GuardianLayout({ children, title, subtitle }) {
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [guardianProfile, setGuardianProfile] = useState(null); // set when the Edit Profile dialog is open
 
   useEffect(() => {
     getManagedSeniors()
@@ -149,6 +152,15 @@ export default function GuardianLayout({ children, title, subtitle }) {
           <div className="absolute bottom-0 left-0 right-0 px-3 py-4 border-t-2" style={{ borderColor: COLORS.alabaster }}>
             <button
               type="button"
+              onClick={() => getMyGuardianProfile().then(setGuardianProfile).catch(() => {})}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg font-semibold text-sm w-full mb-1"
+              style={{ color: COLORS.yale }}
+            >
+              <UserCircle className="w-5 h-5" aria-hidden="true" />
+              Edit My Profile
+            </button>
+            <button
+              type="button"
               onClick={() => setShowLogoutConfirm(true)}
               className="flex items-center gap-3 px-3 py-2.5 rounded-lg font-semibold text-sm w-full"
               style={{ color: "#b8452f" }}
@@ -158,6 +170,16 @@ export default function GuardianLayout({ children, title, subtitle }) {
             </button>
           </div>
         </aside>
+
+        {guardianProfile && (
+          <GuardianEditProfileDialog
+            initial={guardianProfile}
+            submit={updateMyGuardianProfile}
+            colors={COLORS}
+            onClose={() => setGuardianProfile(null)}
+            onSaved={() => setGuardianProfile(null)}
+          />
+        )}
 
         {showLogoutConfirm && (
           <LogoutConfirmDialog
