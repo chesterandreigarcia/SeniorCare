@@ -45,6 +45,21 @@ export const DOCUMENT_TYPES = Object.freeze({
   // Additive — used only by Benefit Applications for program-specific
   // requirements beyond the fixed set collected at registration.
   BENEFIT_SUPPORTING_DOCUMENT: "BENEFIT_SUPPORTING_DOCUMENT",
+  // Medical certificate / doctor's certification / medical record
+  // supporting a declared medical condition (Phase 3). Linked to the
+  // Senior via Document.seniorId like every other document — no separate
+  // reference is stored on Senior.
+  MEDICAL_SUPPORTING_DOCUMENT: "MEDICAL_SUPPORTING_DOCUMENT",
+});
+
+// Verification state of a Senior's *declared* medical condition. Always
+// starts PENDING at registration; only the future Medical Verification
+// phase may move it. Never settable from a request body.
+export const MEDICAL_VERIFICATION_STATUS = Object.freeze({
+  PENDING: "PENDING",
+  VERIFIED: "VERIFIED",
+  REJECTED: "REJECTED",
+  REVISION_REQUIRED: "REVISION_REQUIRED",
 });
 
 export const RELATIONSHIP_TYPES = Object.freeze({

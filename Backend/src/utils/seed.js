@@ -4,6 +4,7 @@
 import "dotenv/config";
 import { connectDatabase, disconnectDatabase } from "../config/database.js";
 import Barangay from "../models/Barangay.js";
+import Illness from "../models/Illness.js";
 import User from "../models/User.js";
 import { hashPassword } from "./password.js";
 import { ROLES, ACCOUNT_STATUS } from "./constants.js";
@@ -12,6 +13,24 @@ const SAMPLE_BARANGAYS = [
   { name: "Barangay San Isidro", municipality: "Sample Municipality", province: "Sample Province", code: "BSI01" },
   { name: "Barangay Santa Cruz", municipality: "Sample Municipality", province: "Sample Province", code: "BSC01" },
   { name: "Barangay Poblacion", municipality: "Sample Municipality", province: "Sample Province", code: "BPB01" },
+];
+
+// Development placeholder list so the registration "medical condition"
+// dropdown isn't empty. Deliberately unclassified — the Admin-managed
+// Illness Database (Phase 4) will own the real list and any
+// classification. Do not treat this as a medical reference.
+const SAMPLE_ILLNESSES = [
+  "Hypertension",
+  "Diabetes",
+  "Heart Disease",
+  "Stroke",
+  "Chronic Kidney Disease",
+  "Chronic Obstructive Pulmonary Disease (COPD)",
+  "Asthma",
+  "Arthritis",
+  "Cancer",
+  "Dementia / Alzheimer's Disease",
+  "Parkinson's Disease",
 ];
 
 async function seed() {
@@ -28,6 +47,11 @@ async function seed() {
     barangays.push(existing);
     console.log(`[seed] barangay ready: ${existing.name}`);
   }
+
+  for (const name of SAMPLE_ILLNESSES) {
+    await Illness.findOneAndUpdate({ name }, { $setOnInsert: { name, isActive: true } }, { upsert: true });
+  }
+  console.log(`[seed] ${SAMPLE_ILLNESSES.length} sample illnesses ready (placeholder list — Phase 4 will replace).`);
 
   // Development-only admin account. Clearly labeled test credentials —
   // change or remove before any real deployment.

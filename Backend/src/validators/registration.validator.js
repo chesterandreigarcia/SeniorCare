@@ -97,6 +97,32 @@ const guardianSchema = z
     }
   });
 
+// Declared medical condition. Only these two client-controlled values
+// exist: whether there is one, and which illness. Verification status,
+// classification, and priority are never read from the request — zod's
+// default object handling strips any such key, and registration.service.js
+// sets the protected values itself. Older clients that omit `medical`
+// entirely are treated as "no medical condition".
+const medicalSchema = z
+  .object({
+    hasMedicalCondition: z.boolean({ invalid_type_error: "Please answer whether you have a medical condition." }),
+    illnessId: objectId.optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.hasMedicalCondition && !data.illnessId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Please select your medical condition.",
+        path: ["illnessId"],
+      });
+    }
+  })
+  .transform((data) => ({
+    hasMedicalCondition: data.hasMedicalCondition,
+    // "No" never carries an illness, even if a stale one was sent.
+    illnessId: data.hasMedicalCondition ? data.illnessId : undefined,
+  }));
+
 export const registrationSchema = z.object({
   barangayId: objectId,
 
@@ -142,6 +168,8 @@ export const registrationSchema = z.object({
   bedridden: z.boolean({ invalid_type_error: "Bedridden status must be true or false." }),
 
   guardian: guardianSchema.optional(),
+
+  medical: medicalSchema.optional().default({ hasMedicalCondition: false }),
 
   accountEmail: z.string().trim().email("Please enter a valid email address."),
   password: z

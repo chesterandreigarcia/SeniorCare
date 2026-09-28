@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import {
   getBarangays,
+  getIllnesses,
   registerSeniorCitizen,
 } from "../services/registrationService.js";
 
@@ -41,10 +42,11 @@ const STEPS = [
   { key: "personal", label: "Personal", n: "02" },
   { key: "contact", label: "Contact", n: "03" },
   { key: "status", label: "Status", n: "04" },
-  { key: "guardian", label: "Guardian", n: "05" },
-  { key: "documents", label: "Documents", n: "06" },
-  { key: "account", label: "Account", n: "07" },
-  { key: "review", label: "Review", n: "08" },
+  { key: "medical", label: "Medical", n: "05" },
+  { key: "guardian", label: "Guardian", n: "06" },
+  { key: "documents", label: "Documents", n: "07" },
+  { key: "account", label: "Account", n: "08" },
+  { key: "review", label: "Review", n: "09" },
 ];
 
 // Barangays now come from GET /api/barangays (see BarangayStep + the
@@ -523,6 +525,8 @@ const BACKEND_TO_LOCAL_ERROR_KEY = {
   "guardian.lastName": "guardianLastName",
   "guardian.relationship": "guardianRelationship",
   "guardian.mobileNumber": "guardianMobile",
+  "medical.illnessId": "illnessName",
+  medicalDocument: "medicalDocument",
   password: "password",
   documents: "documents",
 };
@@ -589,6 +593,21 @@ export default function SeniorCareRegisterPage() {
     };
   }, []);
 
+  // Illness list for the medical step (GET /api/registration/illnesses).
+  const [illnesses, setIllnesses] = useState([]);
+  const [illnessesLoading, setIllnessesLoading] = useState(true);
+  const [illnessesError, setIllnessesError] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    getIllnesses()
+      .then((data) => !cancelled && setIllnesses(data))
+      .catch((err) => !cancelled && setIllnessesError(err.message))
+      .finally(() => !cancelled && setIllnessesLoading(false));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const [form, setForm] = useState({
     barangayId: "",
     barangayName: "", // display-only, kept in sync with barangayId for the review step
@@ -608,6 +627,10 @@ export default function SeniorCareRegisterPage() {
     mobile: "",
     email: "",
     bedridden: "",
+    hasMedicalCondition: "",
+    illnessId: "",
+    illnessName: "",
+    medicalDocument: null,
     hasGuardian: "",
     guardianFirstName: "",
     guardianLastName: "",
@@ -673,6 +696,15 @@ export default function SeniorCareRegisterPage() {
     if (key === "status") {
       if (!form.bedridden)
         newErrors.bedridden = "Please answer this question to continue.";
+    }
+    if (key === "medical") {
+      if (!form.hasMedicalCondition) {
+        newErrors.hasMedicalCondition = "Please answer this question to continue.";
+      } else if (form.hasMedicalCondition === "Yes") {
+        if (!form.illnessId) newErrors.illnessName = "Please select your medical condition.";
+        if (!form.medicalDocument)
+          newErrors.medicalDocument = "Please upload a supporting medical document.";
+      }
     }
     if (key === "guardian" && form.hasGuardian === "Yes") {
       if (!form.guardianFirstName)
@@ -908,6 +940,18 @@ export default function SeniorCareRegisterPage() {
                 set={set}
                 errors={errors}
                 clearError={clearError}
+              />
+            )}
+            {currentKey === "medical" && (
+              <MedicalStep
+                form={form}
+                set={set}
+                setForm={setForm}
+                errors={errors}
+                clearError={clearError}
+                illnesses={illnesses}
+                loading={illnessesLoading}
+                loadError={illnessesError}
               />
             )}
             {currentKey === "guardian" && (
@@ -1443,6 +1487,80 @@ function StatusStep({ form, set, errors, clearError }) {
   );
 }
 
+function MedicalStep({ form, setForm, errors, clearError, illnesses, loading, loadError }) {
+  const yes = form.hasMedicalCondition === "Yes";
+
+  const handleAnswer = (v) => {
+    // Switching to "No" wipes every dependent value so stale medical
+    // data can never be submitted (the payload builder also checks).
+    setForm((f) => ({
+      ...f,
+      hasMedicalCondition: v,
+      ...(v === "No" ? { illnessId: "", illnessName: "", medicalDocument: null } : {}),
+    }));
+    clearError("hasMedicalCondition");
+    clearError("illnessName");
+    clearError("medicalDocument");
+  };
+
+  return (
+    <div>
+      <StepHeading
+        title="Medical Information"
+        helper="Tell us if you have an existing medical condition. Your barangay will review this information later; it does not change your registration right now."
+      />
+      <div className="flex flex-col gap-6">
+        <RadioGroup
+          label="Do you have any existing medical condition?"
+          required
+          name="hasMedicalCondition"
+          options={["No", "Yes"]}
+          value={form.hasMedicalCondition}
+          onChange={handleAnswer}
+          error={errors.hasMedicalCondition}
+        />
+
+        {form.hasMedicalCondition === "No" && (
+          <p className="text-sm text-slate-500">No medical document is required.</p>
+        )}
+
+        {yes && (
+          <>
+            <SelectField
+              id="illnessName"
+              label="Medical Condition"
+              required
+              placeholder={loading ? "Loading conditions..." : "Select medical condition"}
+              options={illnesses.map((i) => i.name)}
+              value={form.illnessName}
+              disabled={loading}
+              onChange={(e) => {
+                const match = illnesses.find((i) => i.name === e.target.value);
+                setForm((f) => ({ ...f, illnessName: e.target.value, illnessId: match?._id || "" }));
+                clearError("illnessName");
+              }}
+              error={errors.illnessName || (loadError ? "Unable to load the list of conditions. Please try again later." : undefined)}
+              helper={!loading && !loadError && illnesses.length === 0 ? "No conditions are available yet. Please contact your barangay office." : undefined}
+            />
+            <FileUploadField
+              label="Medical Supporting Document"
+              required
+              purpose="A medical certificate, doctor's certification, or medical record showing your condition."
+              file={form.medicalDocument}
+              onChange={(f) => {
+                setForm((s) => ({ ...s, medicalDocument: f }));
+                clearError("medicalDocument");
+              }}
+              onRemove={() => setForm((s) => ({ ...s, medicalDocument: null }))}
+              error={errors.medicalDocument}
+            />
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function GuardianStep({ form, set, errors, clearError }) {
   return (
     <div>
@@ -1852,9 +1970,19 @@ function ReviewStep({ form, age, errors, set, goToStep, submitError }) {
         <ReviewRow label="Bedridden" value={form.bedridden} />
       </ReviewSection>
 
+      <ReviewSection title="Medical Information" onEdit={() => goToStep(4)}>
+        <ReviewRow label="Existing medical condition" value={form.hasMedicalCondition} />
+        {form.hasMedicalCondition === "Yes" && (
+          <>
+            <ReviewRow label="Condition" value={form.illnessName} />
+            <ReviewRow label="Supporting document" value={form.medicalDocument?.name} />
+          </>
+        )}
+      </ReviewSection>
+
       <ReviewSection
         title="Guardian / Representative"
-        onEdit={() => goToStep(4)}
+        onEdit={() => goToStep(5)}
       >
         {form.hasGuardian === "Yes" ? (
           <>
@@ -1873,7 +2001,7 @@ function ReviewStep({ form, age, errors, set, goToStep, submitError }) {
         )}
       </ReviewSection>
 
-      <ReviewSection title="Supporting Documents" onEdit={() => goToStep(5)}>
+      <ReviewSection title="Supporting Documents" onEdit={() => goToStep(6)}>
         <ReviewRow label="Valid ID" value={form.validId?.name} />
         <ReviewRow
           label="Senior Citizen ID"
@@ -1891,7 +2019,7 @@ function ReviewStep({ form, age, errors, set, goToStep, submitError }) {
         )}
       </ReviewSection>
 
-      <ReviewSection title="Account" onEdit={() => goToStep(6)}>
+      <ReviewSection title="Account" onEdit={() => goToStep(7)}>
         <ReviewRow label="Email / Username" value={form.accountEmail} />
         <ReviewRow label="Password" value="••••••••" />
       </ReviewSection>

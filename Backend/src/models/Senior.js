@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { SEX, CIVIL_STATUS } from "../utils/constants.js";
+import { SEX, CIVIL_STATUS, MEDICAL_VERIFICATION_STATUS } from "../utils/constants.js";
 
 // Senior profile information only. Deliberately excludes pension amounts,
 // pension/claiming history, assistance history, and application status —
@@ -66,6 +66,23 @@ const seniorSchema = new mongoose.Schema(
     address: { type: addressSchema, required: true },
 
     bedridden: { type: Boolean, required: true, default: false },
+
+    // Declared medical condition (Phase 3). All defaulted so Senior
+    // records created before this phase stay valid: hasMedicalCondition
+    // reads false, the rest read null — no fake medical data is created
+    // for existing Seniors. The supporting document is a Document with
+    // documentType MEDICAL_SUPPORTING_DOCUMENT (linked by seniorId), not
+    // duplicated here. Verification status is set by the server only —
+    // PENDING at registration; the future Medical Verification phase
+    // owns any further change. No classification/priority fields exist
+    // yet on purpose (Phase 4).
+    hasMedicalCondition: { type: Boolean, default: false },
+    medicalConditionId: { type: mongoose.Schema.Types.ObjectId, ref: "Illness", default: null },
+    medicalVerificationStatus: {
+      type: String,
+      enum: [...Object.values(MEDICAL_VERIFICATION_STATUS), null],
+      default: null,
+    },
 
     // Reference to an authorized guardian/representative, if provided.
     guardianId: {

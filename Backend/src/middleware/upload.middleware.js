@@ -39,6 +39,6 @@ export const upload = multer({
   fileFilter,
   limits: {
     fileSize: maxFileSizeBytes,
-    files: 6, // valid ID, senior ID, proof of residency, guardian ID, auth doc, +1 buffer
+    files: 7, // valid ID, senior ID, proof of residency, guardian ID, auth doc, medical doc, +1 buffer
   },
 });

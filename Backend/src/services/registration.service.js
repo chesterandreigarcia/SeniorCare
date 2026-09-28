@@ -3,10 +3,11 @@ import User from "../models/User.js";
 import Senior from "../models/Senior.js";
 import Guardian from "../models/Guardian.js";
 import Barangay from "../models/Barangay.js";
+import Illness from "../models/Illness.js";
 import Verification from "../models/Verification.js";
 import Document from "../models/Document.js";
 import { hashPassword, generateTemporaryPassword } from "../utils/password.js";
-import { ROLES, ACCOUNT_STATUS, VERIFICATION_STATUS, MINIMUM_SENIOR_AGE, DOCUMENT_TYPES } from "../utils/constants.js";
+import { ROLES, ACCOUNT_STATUS, VERIFICATION_STATUS, MINIMUM_SENIOR_AGE, DOCUMENT_TYPES, MEDICAL_VERIFICATION_STATUS } from "../utils/constants.js";
 import { ValidationError, ConflictError, NotFoundError } from "../utils/errors.js";
 import { isSeniorRegistrationEnabled, isGuardianRegistrationEnabled } from "./systemSettings.service.js";
 
@@ -94,6 +95,19 @@ export async function registerSenior(data, uploadedFiles = {}) {
     }
   }
 
+  // Medical condition: the illness must be a real, active entry — free
+  // text is never accepted. Protected values (verification status)
+  // are decided here, never taken from the request.
+  const hasMedicalCondition = Boolean(data.medical?.hasMedicalCondition);
+  if (hasMedicalCondition) {
+    const illness = await Illness.findOne({ _id: data.medical.illnessId, isActive: true });
+    if (!illness) {
+      throw new ValidationError("Please select a valid medical condition.", {
+        "medical.illnessId": "Please select a valid medical condition.",
+      });
+    }
+  }
+
   const passwordHash = await hashPassword(data.password);
   const guardianTemporaryPassword = hasGuardian ? generateTemporaryPassword() : null;
   const guardianPasswordHash = hasGuardian ? await hashPassword(guardianTemporaryPassword) : null;
@@ -131,6 +145,9 @@ export async function registerSenior(data, uploadedFiles = {}) {
             email: data.email,
             address: data.address,
             bedridden: data.bedridden,
+            hasMedicalCondition,
+            medicalConditionId: hasMedicalCondition ? data.medical.illnessId : null,
+            medicalVerificationStatus: hasMedicalCondition ? MEDICAL_VERIFICATION_STATUS.PENDING : null,
           },
         ],
         { session }
@@ -230,6 +247,10 @@ export async function registerSenior(data, uploadedFiles = {}) {
   } finally {
     await session.endSession();
   }
+}
+
+export async function listActiveIllnesses() {
+  return Illness.find({ isActive: true }).sort({ name: 1 }).select("name");
 }
 
 export async function listActiveBarangays() {

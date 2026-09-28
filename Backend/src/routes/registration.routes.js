@@ -13,6 +13,7 @@ const uploadFields = upload.fields([
   { name: "proofResidency", maxCount: 1 },
   { name: "guardianId", maxCount: 1 },
   { name: "guardianAuthDoc", maxCount: 1 },
+  { name: "medicalDocument", maxCount: 1 },
 ]);
 
 // The frontend sends multipart/form-data: file fields as above, plus a
@@ -32,6 +33,7 @@ function parseJsonDataField(req, _res, next) {
 }
 
 router.get("/barangays", registrationController.getBarangays);
+router.get("/illnesses", registrationController.getIllnesses);
 
 router.post(
   "/",
@@ -48,6 +50,16 @@ router.post(
     if (!files.proofResidency?.[0]) missing.push("Proof of Residency");
     if (req.validatedBody.guardian?.hasGuardian && !files.guardianAuthDoc?.[0]) {
       missing.push("Guardian Authorization Document");
+    }
+    // Backend-enforced medical rule: declaring a condition requires both
+    // an illness (checked by the Zod schema) and a supporting document.
+    // Declaring none never requires one.
+    if (req.validatedBody.medical?.hasMedicalCondition && !files.medicalDocument?.[0]) {
+      return next(
+        new ValidationError("Medical condition requires an illness and supporting medical document.", {
+          medicalDocument: "Please upload a supporting medical document.",
+        })
+      );
     }
     if (missing.length) {
       return next(new ValidationError("Please upload all required documents.", { documents: missing }));

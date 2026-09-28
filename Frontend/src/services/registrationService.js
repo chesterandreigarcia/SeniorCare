@@ -6,6 +6,15 @@ import { api, toApiError } from "../utils/api.js";
  * step requires. Backend route: src/routes/registration.routes.js
  * (aliased at /api/barangays in app.js).
  */
+export async function getIllnesses() {
+  try {
+    const res = await api.get("/registration/illnesses");
+    return Array.isArray(res.data?.data) ? res.data.data : [];
+  } catch (err) {
+    throw toApiError(err);
+  }
+}
+
 export async function getBarangays() {
   try {
     const res = await api.get("/barangays");
@@ -94,6 +103,13 @@ function buildRegistrationPayload(form) {
       idNumber: hasGuardian ? form.guardianIdNumber.trim() : "",
     },
 
+    // Only the two client-controlled medical values are ever sent — no
+    // status/classification/priority. "No" never carries an illness.
+    medical: {
+      hasMedicalCondition: form.hasMedicalCondition === "Yes",
+      illnessId: form.hasMedicalCondition === "Yes" ? form.illnessId || undefined : undefined,
+    },
+
     accountEmail: form.accountEmail.trim(),
     password: form.password, // sent once, over HTTPS in production; never persisted client-side
   };
@@ -130,6 +146,9 @@ export async function registerSeniorCitizen(form) {
     formData.append("seniorCitizenId", form.seniorCitizenId);
   if (form.proofResidency)
     formData.append("proofResidency", form.proofResidency);
+  if (payload.medical.hasMedicalCondition && form.medicalDocument) {
+    formData.append("medicalDocument", form.medicalDocument);
+  }
   if (payload.guardian.hasGuardian && form.guardianAuthDoc) {
     formData.append("guardianAuthDoc", form.guardianAuthDoc);
   }
