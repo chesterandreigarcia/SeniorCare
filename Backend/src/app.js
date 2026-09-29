@@ -25,6 +25,7 @@ import adminReportsRoutes from "./routes/adminReports.routes.js";
 import auditLogRoutes from "./routes/auditLog.routes.js";
 import systemSettingsRoutes from "./routes/systemSettings.routes.js";
 import userManagementRoutes from "./routes/userManagement.routes.js";
+import illnessRoutes from "./routes/illness.routes.js";
 import { notFoundHandler, errorHandler } from "./middleware/error.middleware.js";
 import { getBarangays } from "./controllers/registration.controller.js";
 
@@ -71,6 +72,7 @@ export function createApp() {
   app.use("/api/audit-logs", auditLogRoutes);
   app.use("/api/settings", systemSettingsRoutes);
   app.use("/api/admin/users", userManagementRoutes);
+  app.use("/api/admin/illnesses", illnessRoutes);
   // Convenience alias — same handler as GET /api/registration/barangays.
   app.get("/api/barangays", getBarangays);
 

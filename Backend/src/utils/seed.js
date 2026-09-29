@@ -48,8 +48,30 @@ async function seed() {
     console.log(`[seed] barangay ready: ${existing.name}`);
   }
 
+  // Idempotent by design: matches on the normalized name (same
+  // collision key the unique index uses — see models/Illness.js) and
+  // only ever sets fields on insert ($setOnInsert), so re-running `npm
+  // run seed` after an Admin has edited/reclassified/deactivated one of
+  // these records never overwrites that Admin's changes. Deliberately
+  // does NOT set classification/priorityLevel on insert — this phase has
+  // no rule to classify these conditions, so they insert as
+  // unclassified (needsConfiguration: true in the Admin UI) rather than
+  // guessing. Known limitation: if an Admin renames one of these seed
+  // records, its normalizedName changes, so a later seed run will no
+  // longer recognize it as "already seeded" and will insert a fresh
+  // record under the original name — acceptable for a development seed,
+  // but worth knowing before running it against a database with real
+  // Admin edits.
   for (const name of SAMPLE_ILLNESSES) {
-    await Illness.findOneAndUpdate({ name }, { $setOnInsert: { name, isActive: true } }, { upsert: true });
+    const normalizedName = name.trim().toLowerCase();
+    // $setOnInsert here bypasses Mongoose's pre("validate") hook (that
+    // hook only runs on .save()/.create(), not findOneAndUpdate), so
+    // normalizedName is set explicitly rather than relying on it.
+    await Illness.findOneAndUpdate(
+      { normalizedName },
+      { $setOnInsert: { name, normalizedName, isActive: true } },
+      { upsert: true, setDefaultsOnInsert: true }
+    );
   }
   console.log(`[seed] ${SAMPLE_ILLNESSES.length} sample illnesses ready (placeholder list — Phase 4 will replace).`);
 

@@ -62,6 +62,18 @@ export const MEDICAL_VERIFICATION_STATUS = Object.freeze({
   REVISION_REQUIRED: "REVISION_REQUIRED",
 });
 
+// Illness Database (Phase 4) — internal administrative classification.
+// Never exposed to Senior/Guardian; see models/Illness.js.
+export const ILLNESS_CLASSIFICATION = Object.freeze({
+  CRITICAL: "CRITICAL",
+  NON_CRITICAL: "NON_CRITICAL",
+});
+
+export const ILLNESS_PRIORITY = Object.freeze({
+  HIGH: "HIGH",
+  NORMAL: "NORMAL",
+});
+
 export const RELATIONSHIP_TYPES = Object.freeze({
   CHILD: "Child",
   SPOUSE: "Spouse",
@@ -287,4 +299,5 @@ export const AUDIT_MODULES = Object.freeze({
   BENEFITS: "BENEFITS",
   REPORTS: "REPORTS",
   SYSTEM_SETTINGS: "SYSTEM_SETTINGS",
+  ILLNESS_DATABASE: "ILLNESS_DATABASE",
 });

@@ -250,7 +250,13 @@ export async function registerSenior(data, uploadedFiles = {}) {
 }
 
 export async function listActiveIllnesses() {
-  return Illness.find({ isActive: true }).sort({ name: 1 }).select("name");
+  // .lean() explicitly, on top of the existing name-only projection —
+  // belt-and-suspenders so the internal classification/priority (or the
+  // needsConfiguration virtual derived from them; see models/Illness.js)
+  // can never leak into this public, unauthenticated response even
+  // indirectly, regardless of what a future edit to this query selects.
+  const illnesses = await Illness.find({ isActive: true }).sort({ name: 1 }).select("name").lean();
+  return illnesses.map((i) => ({ _id: i._id, name: i.name }));
 }
 
 export async function listActiveBarangays() {
