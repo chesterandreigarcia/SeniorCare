@@ -7,7 +7,7 @@ import Guardian from "../models/Guardian.js";
 import Document from "../models/Document.js";
 import User from "../models/User.js";
 import Barangay from "../models/Barangay.js";
-import { ACCOUNT_STATUS, VERIFICATION_STATUS, ROLES, NOTIFICATION_TYPE, AUDIT_ACTIONS, AUDIT_MODULES } from "../utils/constants.js";
+import { ACCOUNT_STATUS, VERIFICATION_STATUS, ROLES, NOTIFICATION_TYPE, AUDIT_ACTIONS, AUDIT_MODULES, DOCUMENT_TYPES } from "../utils/constants.js";
 import { NotFoundError, AuthorizationError, ConflictError } from "../utils/errors.js";
 import { createNotification } from "./notification.service.js";
 import { safeCreateAuditLog } from "./auditLog.service.js";
@@ -154,6 +154,16 @@ export async function getDocumentForDownload(documentId, requestingUser) {
   if (!senior) throw new NotFoundError("Associated senior profile not found.");
 
   const hasBroadAccess = [ROLES.ADMIN, ROLES.LGU_OSCA].includes(requestingUser.role);
+  // Phase 5 privacy boundary: MEDICAL_SUPPORTING_DOCUMENT is the one
+  // document type Barangay Staff must NOT reach here yet — Phase 5 gives
+  // Staff no medical workflow at all (Phase 6's Home Visit queue is
+  // where that begins), unlike every other document type this endpoint
+  // already lets Staff review for registration verification in their
+  // own barangay. Scoped to this one documentType so nothing else this
+  // function does for Staff changes.
+  if (document.documentType === DOCUMENT_TYPES.MEDICAL_SUPPORTING_DOCUMENT && !hasBroadAccess) {
+    throw new AuthorizationError("You are not authorized to view this document.");
+  }
   if (!hasBroadAccess) {
     if (!requestingUser.assignedBarangayId || requestingUser.assignedBarangayId !== senior.barangayId.toString()) {
       throw new AuthorizationError("You are not authorized to view this document.");

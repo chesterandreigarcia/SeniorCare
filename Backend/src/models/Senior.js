@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { SEX, CIVIL_STATUS, MEDICAL_VERIFICATION_STATUS } from "../utils/constants.js";
+import { SEX, CIVIL_STATUS, MEDICAL_VERIFICATION_STATUS, ILLNESS_CLASSIFICATION, ILLNESS_PRIORITY, HOME_VISIT_STATUS } from "../utils/constants.js";
 
 // Senior profile information only. Deliberately excludes pension amounts,
 // pension/claiming history, assistance history, and application status —
@@ -83,6 +83,38 @@ const seniorSchema = new mongoose.Schema(
       enum: [...Object.values(MEDICAL_VERIFICATION_STATUS), null],
       default: null,
     },
+
+    // Phase 5 — Admin Medical Verification outcome. Deliberately kept on
+    // Senior rather than a separate collection: Phase 3/4 already put
+    // every other medical field here (models/Illness.js's own
+    // classification/priorityLevel is the *system-generated
+    // recommendation*; these are the *Admin-confirmed-or-overridden
+    // final values*, which is why they're named/stored separately
+    // rather than overwriting the Illness record's own fields — the
+    // Illness Database's classification must keep meaning "the default
+    // for this condition", not "what one Admin decided for one Senior").
+    //
+    // Every field below is Admin-only data. senior.service.js#getMySeniorProfile
+    // and guardian.service.js's summarizeSenior() never include these —
+    // see their own comments. Only set via medicalVerification.service.js.
+    medicalClassification: { type: String, enum: [...Object.values(ILLNESS_CLASSIFICATION), null], default: null },
+    medicalPriorityLevel: { type: String, enum: [...Object.values(ILLNESS_PRIORITY), null], default: null },
+    medicalVerificationRemarks: { type: String, trim: true, default: "" },
+    medicalVerifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    medicalVerifiedAt: { type: Date, default: null },
+
+    // Home Visit decision — Phase 5 only records the Admin's decision;
+    // the actual visit workflow (scheduling, findings, endorsement) is
+    // Phase 6 and does not exist yet. `homeVisitStatus` is what Phase 6
+    // will query to find Seniors ready for its queue (REQUIRED).
+    homeVisitStatus: {
+      type: String,
+      enum: [...Object.values(HOME_VISIT_STATUS), null],
+      default: null,
+    },
+    homeVisitRemarks: { type: String, trim: true, default: "" },
+    homeVisitDecidedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    homeVisitDecidedAt: { type: Date, default: null },
 
     // Reference to an authorized guardian/representative, if provided.
     guardianId: {

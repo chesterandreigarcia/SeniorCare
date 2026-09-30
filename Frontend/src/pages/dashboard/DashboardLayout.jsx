@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Heart, ClipboardCheck, LogOut, Menu, X, ShieldCheck, Building2, Users2, Wallet, HandHeart, Megaphone, Users, MessageSquareWarning, Map, BarChart3, History, Settings, UserCog, Stethoscope } from "lucide-react";
+import { Heart, ClipboardCheck, LogOut, Menu, X, ShieldCheck, Building2, Users2, Wallet, HandHeart, Megaphone, Users, MessageSquareWarning, Map, BarChart3, History, Settings, UserCog, Stethoscope, ClipboardPlus } from "lucide-react";
 import { logout as apiLogout, clearSession, getStoredUser } from "../../services/authService.js";
 import { getPublicSettings } from "../../services/systemSettingsService.js";
 import NotificationBell from "../../components/NotificationBell.jsx";
@@ -109,6 +109,12 @@ export default function DashboardLayout({ children, title, subtitle }) {
             icon: Stethoscope,
             label: "Illness Database",
             active: location.pathname.startsWith("/admin/illnesses"),
+          },
+          {
+            to: "/admin/medical-verification",
+            icon: ClipboardPlus,
+            label: "Medical Verification",
+            active: location.pathname.startsWith("/admin/medical-verification"),
           },
           {
             to: "/admin/settings",

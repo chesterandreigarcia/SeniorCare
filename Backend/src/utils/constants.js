@@ -74,6 +74,17 @@ export const ILLNESS_PRIORITY = Object.freeze({
   NORMAL: "NORMAL",
 });
 
+// Phase 5 — Admin's Home Visit decision outcome, stored on Senior (see
+// models/Senior.js). Deliberately only the three states Phase 5 itself
+// produces — SCHEDULED/COMPLETED are Phase 6 concepts and don't exist
+// until that phase actually implements the Barangay queue that would
+// set them.
+export const HOME_VISIT_STATUS = Object.freeze({
+  NOT_REQUIRED: "NOT_REQUIRED",
+  PENDING_DECISION: "PENDING_DECISION",
+  REQUIRED: "REQUIRED",
+});
+
 export const RELATIONSHIP_TYPES = Object.freeze({
   CHILD: "Child",
   SPOUSE: "Spouse",
@@ -202,6 +213,7 @@ export const NOTIFICATION_TYPE = Object.freeze({
   ACTIVITY: "ACTIVITY",
   CONCERN: "CONCERN",
   SYSTEM: "SYSTEM",
+  MEDICAL: "MEDICAL",
 });
 
 // ---- Reports / Concerns ----
@@ -288,6 +300,20 @@ export const AUDIT_ACTIONS = Object.freeze({
   CLAIM: "CLAIM",
   CANCEL: "CANCEL",
   EXPORT: "EXPORT",
+  // Phase 5 — Admin Medical Verification. Kept as distinct, specific
+  // actions (rather than reusing generic APPROVE/REJECT) because the
+  // module's own spec names these exact events as what must be logged,
+  // and "verification confirmed" here means something structurally
+  // different from a registration APPROVE (it doesn't activate an
+  // account, and it can independently carry a classification/priority
+  // override on top of the outcome itself).
+  MEDICAL_VERIFICATION_STARTED: "MEDICAL_VERIFICATION_STARTED",
+  MEDICAL_VERIFICATION_CONFIRMED: "MEDICAL_VERIFICATION_CONFIRMED",
+  MEDICAL_VERIFICATION_REJECTED: "MEDICAL_VERIFICATION_REJECTED",
+  MEDICAL_REVISION_REQUESTED: "MEDICAL_REVISION_REQUESTED",
+  MEDICAL_CLASSIFICATION_OVERRIDDEN: "MEDICAL_CLASSIFICATION_OVERRIDDEN",
+  MEDICAL_PRIORITY_OVERRIDDEN: "MEDICAL_PRIORITY_OVERRIDDEN",
+  HOME_VISIT_DECISION_RECORDED: "HOME_VISIT_DECISION_RECORDED",
 });
 
 export const AUDIT_MODULES = Object.freeze({
@@ -300,4 +326,5 @@ export const AUDIT_MODULES = Object.freeze({
   REPORTS: "REPORTS",
   SYSTEM_SETTINGS: "SYSTEM_SETTINGS",
   ILLNESS_DATABASE: "ILLNESS_DATABASE",
+  MEDICAL_VERIFICATION: "MEDICAL_VERIFICATION",
 });

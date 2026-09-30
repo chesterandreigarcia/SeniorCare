@@ -22,10 +22,9 @@ export async function getMySeniorProfile(userId) {
   const user = await User.findById(userId);
   if (!user) throw new NotFoundError("Account not found.");
 
-  const senior = await Senior.findOne({ userId: user._id }).populate(
-    "barangayId",
-    "name municipality province"
-  );
+  const senior = await Senior.findOne({ userId: user._id })
+    .populate("barangayId", "name municipality province")
+    .populate("medicalConditionId", "name");
   if (!senior) throw new NotFoundError("Senior profile not found.");
 
   let guardian = null;
@@ -66,6 +65,19 @@ export async function getMySeniorProfile(userId) {
         }
       : null,
     guardian,
+    // Phase 5 privacy boundary: a Senior may see THAT they declared a
+    // condition, WHICH condition, and the current review status — never
+    // the internal classification/priority (models/Illness.js's own
+    // fields, or Senior.medicalClassification/medicalPriorityLevel),
+    // any override reasoning, Home Visit decision/remarks, or which
+    // Admin reviewed it. Those stay Admin-only (medicalVerification.service.js).
+    medical: senior.hasMedicalCondition
+      ? {
+          hasMedicalCondition: true,
+          conditionName: senior.medicalConditionId?.name || null,
+          verificationStatus: senior.medicalVerificationStatus,
+        }
+      : { hasMedicalCondition: false },
   };
 }
 

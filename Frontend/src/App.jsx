@@ -19,6 +19,7 @@ import AuditLogsPage from "./pages/dashboard/AuditLogsPage.jsx";
 import SystemSettingsPage from "./pages/dashboard/SystemSettingsPage.jsx";
 import UserManagementPage from "./pages/dashboard/UserManagementPage.jsx";
 import IllnessDatabasePage from "./pages/dashboard/IllnessDatabasePage.jsx";
+import MedicalVerificationPage from "./pages/dashboard/MedicalVerificationPage.jsx";
 import SeniorDashboard from "./pages/senior/SeniorDashboard.jsx";
 import GuardianDashboard from "./pages/guardian/GuardianDashboard.jsx";
 import GuardianSeniorsPage from "./pages/guardian/GuardianSeniorsPage.jsx";
@@ -242,6 +243,14 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={["ADMIN"]}>
               <IllnessDatabasePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/medical-verification"
+          element={
+            <ProtectedRoute allowedRoles={["ADMIN"]}>
+              <MedicalVerificationPage />
             </ProtectedRoute>
           }
         />
